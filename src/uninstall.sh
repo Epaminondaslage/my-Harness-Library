@@ -31,17 +31,26 @@ systemctl daemon-reload
 echo "  ok"
 
 echo "== Removing nginx route =="
-VHOST="$(grep -rls 'my-harness-library/api' /etc/nginx/sites-enabled/ 2>/dev/null \
+# -R, not -r: sites-enabled is a directory of symlinks.
+VHOST="$(grep -Rls 'my-harness-library/api' /etc/nginx/sites-enabled/ 2>/dev/null \
                  | xargs -r -n1 readlink -f | sort -u | head -1)"
 if [[ -n "$VHOST" ]]; then
-  cp -a "$VHOST" "$VHOST.bak-$(date +%Y%m%d-%H%M%S)"
-  # Drops the location block and the two comment lines above it.
+  BACKUP="$VHOST.bak-$(date +%Y%m%d-%H%M%S)"
+  cp -a "$VHOST" "$BACKUP"
+  # Read from the single backup just made — never from a glob. A previous
+  # version used "$VHOST.bak-"*, which on a host with several backups fed
+  # every one of them to awk and wrote the concatenation back as the vhost.
   awk '
-    /# My Harness Library backend/        { skip=1 }
-    skip && /^[[:space:]]*\}/             { skip=0; next }
-    !skip                                 { print }
-  ' "$VHOST.bak-"* > "$VHOST"
-  echo "  ok (backup kept next to it)"
+    /# My Harness Library backend/ { skip=1 }
+    skip && /^[[:space:]]*\}/      { skip=0; next }
+    !skip                          { print }
+  ' "$BACKUP" > "$VHOST"
+  if nginx -t >/dev/null 2>&1; then
+    echo "  ok (backup: $BACKUP)"
+  else
+    cp -a "$BACKUP" "$VHOST"
+    echo "  nginx -t failed; vhost restored from $BACKUP"
+  fi
 else
   echo "  not found"
 fi
