@@ -4,10 +4,9 @@
 # Template. setup.sh substitutes @USER@, @HOME@ and @PREFIX@ and installs the
 # result as /etc/systemd/system/harness-library.service.
 #
-# The isolation that used to come from PHP's open_basedir and disable_functions
-# now comes from the kernel, through the directives below. It is strictly
-# stronger: an interpreter setting can be worked around by native code, a
-# seccomp filter and a mount namespace cannot.
+# All of the isolation lives here, in the kernel: a read-only filesystem with
+# one writable hole, no capabilities, no network address family beyond AF_UNIX,
+# and a syscall filter that denies process creation outright.
 # =============================================================================
 
 [Unit]

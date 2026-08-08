@@ -5,7 +5,6 @@ last-run.log
 
 # Local state and secrets — must never reach the repository
 *.hash
-auth.php
 audit.log
 status.json
 *.request

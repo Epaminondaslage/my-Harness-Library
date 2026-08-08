@@ -92,15 +92,7 @@ step "Current installation"
 systemctl is-active --quiet harness-library 2>/dev/null && ok "backend running" || warn "backend not running"
 # -R (not -r): sites-enabled is made of symlinks, which -r skips.
 grep -Rqs 'my-harness-library/api' /etc/nginx/sites-enabled/ && ok "nginx route configured" || warn "nginx route absent"
-if [[ -f "$STATE/auth.hash" ]]; then
-  if head -c 3 "$STATE/auth.hash" | grep -q '^\$2'; then
-    warn "password stored in the old bcrypt format — will be reset below"
-  else
-    ok "write password set"
-  fi
-else
-  warn "write password not set"
-fi
+[[ -f "$STATE/auth.hash" ]] && ok "write password set" || warn "write password not set"
 crontab -u "$TARGET_USER" -l 2>/dev/null | grep -q 'regenerate.sh' && ok "regeneration cron installed" || warn "cron absent"
 [[ -f "$WEBROOT/index.html" ]] && ok "page published at $WEBROOT" || warn "page not published"
 
@@ -145,30 +137,6 @@ sed -e "s|@USER@|$TARGET_USER|g" \
 chmod 644 "$UNIT"
 systemctl daemon-reload
 ok "$UNIT"
-
-step "Removing the previous installation, if present"
-# Upgrade path from the PHP version: drop its nginx location block and its
-# FPM pool. Harmless no-op on a fresh install.
-LEGACY_VHOST="$(grep -Rls 'claude-inventory/api' /etc/nginx/sites-enabled/ 2>/dev/null \
-                 | xargs -r -n1 readlink -f | sort -u | head -1)"
-if [[ -n "$LEGACY_VHOST" ]]; then
-  cp -a "$LEGACY_VHOST" "$LEGACY_VHOST.bak-php-$(date +%Y%m%d-%H%M%S)"
-  awk '
-    /claude-inventory\/api(\.php)? \{/ { skip=1; next }
-    skip && /^[[:space:]]*\}/       { skip=0; next }
-    skip                            { next }
-    /# Editor do inventario Claude Code|# Harness Library editor|# Match exato|# over any regex location block|# prioridade sobre qualquer regex/ { next }
-    { print }
-  ' "$LEGACY_VHOST.bak-php-"* > "$LEGACY_VHOST"
-  ok "old /claude-inventory route removed from $LEGACY_VHOST"
-fi
-for pool in /etc/php/*/fpm/pool.d/claude-inventory.conf; do
-  [[ -f "$pool" ]] || continue
-  rm -f "$pool"
-  ok "old FPM pool removed: $pool"
-  PHPOLD="$(basename "$(dirname "$(dirname "$pool")")")"
-  systemctl reload "php$PHPOLD-fpm" 2>/dev/null
-done
 
 step "nginx route"
 # Only sites-ENABLED counts: sites-available also holds backups, and writing
@@ -218,11 +186,6 @@ fi
 step "Publishing files"
 install -d -o "$TARGET_USER" -g www-data -m 2775 "$WEBROOT"
 install -d -o "$TARGET_USER" -g "$TARGET_USER" -m 700 "$STATE"
-# Remove the previous location entirely, if this is an upgrade.
-if [[ -d /var/www/html/claude-inventory ]]; then
-  rm -rf /var/www/html/claude-inventory
-  ok "old web root /var/www/html/claude-inventory removed"
-fi
 ok "$WEBROOT"
 
 step "Write password"
@@ -241,14 +204,9 @@ os.replace(tmp, path)
 PY
 }
 
-LEGACY=0
-[[ -f "$STATE/auth.hash" ]] && head -c 3 "$STATE/auth.hash" | grep -q '^\$2' && LEGACY=1
-
-if [[ -f "$STATE/auth.hash" ]] && (( ! LEGACY )); then
+if [[ -f "$STATE/auth.hash" ]]; then
   ok "already set — change it from the page (🔑 button)"
 else
-  (( LEGACY )) && warn "the old bcrypt hash cannot be verified without extra
-          dependencies; setting the password again with scrypt"
   if [[ -n "${HARNESS_PASSWORD:-}" ]]; then
     set_password "$HARNESS_PASSWORD"
     ok "taken from \$HARNESS_PASSWORD"

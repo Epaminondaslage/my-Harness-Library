@@ -2,9 +2,8 @@
 # =============================================================================
 # api.py — read/write backend for My Harness Library
 # -----------------------------------------------------------------------------
-# Replaces the previous PHP endpoint. Standard library only: no pip install,
-# no virtualenv, nothing vendored. Speaks JSON over a Unix socket; nginx
-# proxies exactly one URL to it.
+# Standard library only: no pip install, no virtualenv, nothing vendored.
+# Speaks JSON over a Unix socket; nginx proxies exactly one URL to it.
 #
 # Actions (all POST, JSON in / JSON out):
 #   read     {file}                        -> content + mtime
@@ -69,9 +68,9 @@ class ApiError(Exception):
 # Password — scrypt from the standard library
 # ---------------------------------------------------------------------------
 # Stored as: scrypt$n$r$p$<salt hex>$<key hex>
-# The old PHP backend used bcrypt, which the standard library cannot verify.
-# A bcrypt hash is therefore reported as unusable and setup.sh asks for a new
-# password once. Trading one re-entry for zero dependencies.
+# scrypt is what the standard library offers for password hashing, so the whole
+# project stays dependency-free. Its memory-hard construction also costs an
+# attacker more per guess than a plain iterated hash.
 
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
 
@@ -101,10 +100,6 @@ def check_password(sent: str, ctx: tuple = ("?", "")) -> None:
     if not AUTH_FILE.is_file():
         raise ApiError(500, "Write password not configured on the server.")
     stored = AUTH_FILE.read_text(encoding="utf-8").strip()
-
-    if stored.startswith("$2"):        # legacy bcrypt from the PHP backend
-        raise ApiError(500, "Password stored in the old bcrypt format. "
-                            "Run setup.sh to set it again.", "senha_legado")
 
     if not sent or not verify_password(sent, stored):
         time.sleep(0.4)                # slow down bulk guessing
