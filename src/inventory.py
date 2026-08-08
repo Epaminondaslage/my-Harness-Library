@@ -981,6 +981,80 @@ def health_badge(repo: str) -> tuple:
     return (f'<span class="health">{"".join(sel)}</span>' if sel else ""), estrelas, dias
 
 
+# -----------------------------------------------------------------------------
+# Versao e aviso de atualizacao
+# -----------------------------------------------------------------------------
+# A versao vive num arquivo VERSION ao lado dos fontes, gravado pelo instalador.
+# A checagem de novidade so roda com --online e guarda o resultado em disco, de
+# modo que a geracao offline continua mostrando o ultimo estado conhecido.
+
+VERSION_URL = ("https://raw.githubusercontent.com/"
+               "Epaminondaslage/my-Harness-Library/main/VERSION")
+
+
+def local_version() -> str:
+    for cand in (Path(__file__).resolve().parent / "VERSION",
+                 Path(__file__).resolve().parent.parent / "VERSION"):
+        try:
+            if cand.is_file():
+                return cand.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    return ""
+
+
+def semver(v: str) -> tuple:
+    """(1, 2, 3) a partir de "1.2.3"; partes nao numericas viram 0."""
+    partes = re.split(r"[.\-+]", v.strip().lstrip("v"))[:3]
+    out = []
+    for x in partes:
+        out.append(int(x) if x.isdigit() else 0)
+    while len(out) < 3:
+        out.append(0)
+    return tuple(out)
+
+
+def update_cache_path() -> Path:
+    return BASE / ".inventory" / "update.json"
+
+
+def check_update(instalada: str) -> dict:
+    """
+    Compara a versao instalada com a publicada. Falha de rede nao e erro:
+    devolve o ultimo resultado conhecido, ou nada.
+    """
+    cache = update_cache_path()
+    anterior = {}
+    if cache.is_file():
+        try:
+            anterior = json.loads(cache.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            anterior = {}
+
+    if not ONLINE:
+        return anterior
+
+    try:
+        req = urllib.request.Request(VERSION_URL, headers={"User-Agent": "my-harness-library"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            publicada = r.read().decode("utf-8", errors="replace").strip()
+    except Exception:
+        return anterior                    # mantem o que se sabia antes
+
+    dados = {
+        "instalada": instalada,
+        "publicada": publicada,
+        "desatualizado": bool(instalada) and semver(publicada) > semver(instalada),
+        "checado": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(dados, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+    return dados
+
+
 def host_ip() -> str:
     """
     IP da maquina que gerou o inventario. Abre um socket UDP para um destino
@@ -1061,6 +1135,8 @@ def build_site(items: list) -> None:
     generated = datetime.now().strftime("%d/%m/%Y %H:%M")
 
     # Procedencia do inventario: onde rodou, o que varreu e de quem e o ambiente
+    versao   = local_version()
+    atualiza = check_update(versao)
     ip_str   = html.escape(host_ip())
     host_str = html.escape(socket.gethostname())
     base_str = html.escape(str(BASE))
@@ -1160,6 +1236,20 @@ def build_site(items: list) -> None:
                              f'<span {bi(label, CATEGORY_EN[c])}>{label}</span> '
                              f'<span>{cat_counts[c]}</span></button>')
 
+    # Aviso de versao nova. So aparece quando a checagem (que roda no --online)
+    # apurou que ha algo mais recente publicado.
+    if atualiza.get("desatualizado"):
+        nova = html.escape(atualiza.get("publicada", ""))
+        update_banner = f"""
+    <div class="update-banner">
+      <span {bi(f"Versão {nova} disponível — você está na {html.escape(versao)}.",
+                f"Version {nova} available — you are on {html.escape(versao)}.")}>
+        Versão {nova} disponível — você está na {html.escape(versao)}.</span>
+      <code>curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/main/install.sh | sudo bash</code>
+    </div>"""
+    else:
+        update_banner = ""
+
     index_html = f"""<!DOCTYPE html>
 <!-- =====================================================================
      Claude Code - Inventario de Recursos (skills, agents, commands,
@@ -1232,8 +1322,10 @@ def build_site(items: list) -> None:
         <div><dt {bi("Host", "Host")}>Host</dt><dd>{ip_str} <span class="origin-alt">({host_str})</span></dd></div>
         <div><dt {bi("Diretório", "Directory")}>Diretório</dt><dd>{base_str}</dd></div>
         <div><dt {bi("Usuário", "User")}>Usuário</dt><dd>{user_str}</dd></div>
+        <div><dt {bi("Versão", "Version")}>Versão</dt><dd>{html.escape(versao or "?")}</dd></div>
       </dl>
     </section>
+{update_banner}
 
     <input id="search" class="search" type="text"
            data-pt-ph="Buscar por nome ou descrição..."
@@ -1621,6 +1713,31 @@ body {
   word-break: break-all;
 }
 .origin-alt { color: var(--muted-2); font-size: .78rem; }
+
+/* ---- Aviso de versao nova ---- */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  background: var(--c-integracoes-bg);
+  color: var(--c-integracoes-fg);
+  border-radius: 8px;
+  padding: .6rem .9rem;
+  margin-bottom: 1rem;
+  font-size: .82rem;
+  font-weight: 500;
+}
+.update-banner code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: .72rem;
+  font-weight: 400;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: .25rem .5rem;
+  word-break: break-all;
+}
 
 /* ---- Campo de busca ---- */
 .search {

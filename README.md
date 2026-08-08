@@ -21,6 +21,7 @@ On a typical installation the difference is stark: the Claude Code plugin list s
 - [Security model](#security-model)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
+- [Updating](#updating)
 - [Uninstalling](#uninstalling)
 - [Troubleshooting](#troubleshooting)
 - [Project layout](#project-layout)
@@ -350,6 +351,38 @@ GITHUB_TOKEN="$(gh auth token)" bash /opt/harness-library/regenerate.sh --online
 ```
 
 ---
+
+## Updating
+
+Re-run the same one-liner. It is idempotent: it does not change your password,
+duplicate cron entries or touch the nginx route if it is already there.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/main/install.sh | sudo bash
+```
+
+The installed version is shown on the provenance card and by
+`bash setup.sh --check`. When a newer one is published, a banner appears at the
+top of the page with the command to run — the check happens under `--online`
+and is cached, so the offline daily regeneration keeps showing the last known
+answer.
+
+**There is no automatic update, by design.** Making a machine fetch and execute
+code from GitHub as root on a schedule means whoever controls this repository —
+or anyone who steals a token with write access to it — controls every install,
+silently. That is a poor trade for skipping one command, and it is worse here
+than in most tools, because this one writes into a directory your agent later
+executes.
+
+If you accept that trade for a machine of your own, it is one root cron entry:
+
+```bash
+# sudo crontab -e   — updates every Monday at 05:00, unattended
+0 5 * * 1 curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/main/install.sh | bash
+```
+
+Pin `HARNESS_REF` to a tag instead of `main` if you want updates only when you
+move the pin.
 
 ## Uninstalling
 

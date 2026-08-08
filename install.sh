@@ -42,6 +42,9 @@ curl -fsSL "$TARBALL" | tar -xz -C "$TMP" --strip-components=1
 echo "  installing to $PREFIX"
 mkdir -p "$PREFIX"
 cp -a "$TMP/src/." "$PREFIX/"
+# O VERSION mora na raiz do repo, mas precisa acompanhar os fontes: e ele que
+# a pagina mostra e que a checagem de atualizacao compara.
+cp -a "$TMP/VERSION" "$PREFIX/VERSION" 2>/dev/null || true
 chmod +x "$PREFIX"/*.sh
 
 # The setup runs as root but configures things for the invoking user, which

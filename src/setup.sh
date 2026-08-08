@@ -77,6 +77,13 @@ else
   bad "python $PYVER — 3.9 or newer required"
 fi
 
+step "Version"
+if [[ -f "$DIR/VERSION" ]]; then
+  ok "installed: $(cat "$DIR/VERSION")"
+else
+  warn "no VERSION file next to the sources"
+fi
+
 step "Environment"
 [[ -d "$TARGET_HOME/.claude" ]] \
   && ok "~/.claude of $TARGET_USER  ${DIM}($TARGET_HOME/.claude)${OFF}" \
