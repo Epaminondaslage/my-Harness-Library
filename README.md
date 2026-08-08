@@ -161,7 +161,7 @@ sudo bash src/setup.sh         # install
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `HARNESS_PASSWORD` | — | initial write password, skipping prompt and default |
+| `HARNESS_PASSWORD` | — | initial write password, skipping prompt and default. Minimum 8 characters; a shorter one aborts the install. |
 | `HARNESS_REF` | `main` | git ref to install |
 | `HARNESS_PREFIX` | `/opt/harness-library` | where sources are kept |
 

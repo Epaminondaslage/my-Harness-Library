@@ -208,6 +208,12 @@ if [[ -f "$STATE/auth.hash" ]]; then
   ok "already set — change it from the page (🔑 button)"
 else
   if [[ -n "${HARNESS_PASSWORD:-}" ]]; then
+    # The interactive path enforces this; the environment path used to skip it,
+    # so a five-character password went straight in without a word.
+    if (( ${#HARNESS_PASSWORD} < 8 )); then
+      echo "  ${RED}refused${OFF} \$HARNESS_PASSWORD has ${#HARNESS_PASSWORD} characters; minimum is 8"
+      exit 1
+    fi
     set_password "$HARNESS_PASSWORD"
     ok "taken from \$HARNESS_PASSWORD"
   elif [[ -t 0 ]]; then
