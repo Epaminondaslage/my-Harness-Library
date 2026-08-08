@@ -142,7 +142,7 @@ loads. The other 183 sit in a marketplace catalogue, waiting to be installed.*
 
 The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
 
-Below it, a provenance card shows which host, which directory and which user this inventory came from — so a page shared between machines is never ambiguous.
+Below it, a provenance card shows which host, which directory, which user and which version this inventory came from — so a page shared between machines is never ambiguous, and you can tell at a glance whether it was built by an old install.
 
 Then: a search box, type tabs (`All 248 · Skills 108 · Agents 43 · Commands 37 · Plugins 58 · MCPs 2`), and two rows of filter chips — **Source** (`Mine 4 · Installed 52 · Available 183 · From project 9`) and **Purpose**. Filters combine with each other and with the search.
 
