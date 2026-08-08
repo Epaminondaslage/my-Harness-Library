@@ -1,0 +1,76 @@
+# =============================================================================
+# harness-library.service — backend of My Harness Library
+#
+# Template. setup.sh substitutes @USER@, @HOME@ and @PREFIX@ and installs the
+# result as /etc/systemd/system/harness-library.service.
+#
+# The isolation that used to come from PHP's open_basedir and disable_functions
+# now comes from the kernel, through the directives below. It is strictly
+# stronger: an interpreter setting can be worked around by native code, a
+# seccomp filter and a mount namespace cannot.
+# =============================================================================
+
+[Unit]
+Description=My Harness Library backend
+Documentation=https://github.com/Epaminondaslage/my-Harness-Library
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+# www-data so nginx can connect to the socket. The process still runs with
+# @USER@'s UID, which is what grants access to ~/.claude (mode 700).
+Group=www-data
+UMask=0077
+
+Environment=HOME=@HOME@
+Environment=PYTHONUNBUFFERED=1
+Environment=HARNESS_SOCKET=/run/harness-library/sock
+RuntimeDirectory=harness-library
+RuntimeDirectoryMode=0750
+
+ExecStart=/usr/bin/python3 @PREFIX@/api.py
+Restart=on-failure
+RestartSec=2
+
+# ---- Filesystem -----------------------------------------------------------
+# Read-only everything, then punch exactly one writable hole.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@HOME@/.claude
+PrivateTmp=yes
+PrivateDevices=yes
+
+# ---- Privilege ------------------------------------------------------------
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+# ---- Kernel and namespaces ------------------------------------------------
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+
+# ---- Syscalls and network -------------------------------------------------
+# @system-service minus the process-spawning family: this service must never
+# be able to exec anything, which is why regeneration is queued to cron.
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete @mount @debug @swap
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX
+
+# ---- Resources ------------------------------------------------------------
+MemoryMax=128M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

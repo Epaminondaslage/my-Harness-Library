@@ -105,12 +105,14 @@ Then: a search box, type tabs (`All 310 · Skills 155 · Agents 52 · Commands 4
 ## Requirements
 
 - Linux with **systemd**, **nginx** and **cron**
-- **PHP 8.0+** with CLI and FPM (any minor version — it is detected, not hardcoded)
-- **Python 3.8+** — standard library only, no `pip install`
+- **Python 3.9+** — standard library only. No `pip install`, no virtualenv, nothing vendored.
 - `curl`, `tar`, `flock`
 - A user account owning `~/.claude`
 
-Tested on Ubuntu 24.04 with PHP 8.3 and nginx 1.24. The installer checks all of the above and installs what is missing via `apt`.
+That is the whole list. The generator and the backend are both Python; there is no
+second runtime, no package manifest and no dependency to keep patched.
+
+Tested on Ubuntu 24.04 with Python 3.12 and nginx 1.24. The installer checks all of the above and installs what is missing via `apt`.
 
 The page is served from `/var/www/html/claude-inventory` by your existing nginx. If nothing is serving `/var/www/html` yet, the installer falls back to the default site.
 
@@ -124,7 +126,7 @@ The page is served from `/var/www/html/claude-inventory` by your existing nginx.
 curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/main/install.sh | sudo bash
 ```
 
-This downloads the sources to `/opt/harness-library` and runs the setup: dependency check, PHP-FPM pool, nginx route, cron entries, first generation, smoke test.
+This downloads the sources to `/opt/harness-library` and runs the setup: dependency check, systemd service, nginx route, cron entries, first generation, smoke test.
 
 To choose the password up front instead of accepting the default:
 
@@ -193,14 +195,21 @@ That is the literal initial password. It is deliberately weak and deliberately m
 
 It takes effect on the very next request — no restart, no reload, no service to bounce. The old password stops working immediately, and the change is recorded in the audit log.
 
-Only a **bcrypt hash** is ever written to disk, at `~/.claude/.inventory/auth.hash`, mode `600`. The plaintext is never stored, never logged, and never leaves the request.
+Only an **scrypt hash** is ever written to disk, at `~/.claude/.inventory/auth.hash`, mode `600` — parameters `N=16384, r=8, p=1`, a 16-byte random salt, compared in constant time. The plaintext is never stored, never logged, and never leaves the request.
 
 There is no password recovery, by design. If you lose it, you have shell access to the machine — rewrite the hash:
 
 ```bash
-php -r 'file_put_contents(getenv("HOME")."/.claude/.inventory/auth.hash",
-  password_hash($argv[1], PASSWORD_BCRYPT)."\n");' 'new-password'
-chmod 600 ~/.claude/.inventory/auth.hash
+python3 - 'new-password' <<'EOS'
+import hashlib, secrets, sys, pathlib
+plain = sys.argv[1]
+path = pathlib.Path.home() / ".claude/.inventory/auth.hash"
+salt = secrets.token_bytes(16)
+n, r, p = 2**14, 8, 1
+key = hashlib.scrypt(plain.encode(), salt=salt, n=n, r=r, p=p, dklen=32)
+path.write_text(f"scrypt${n}${r}${p}${salt.hex()}${key.hex()}\n")
+path.chmod(0o600)
+EOS
 ```
 
 > **Before exposing this beyond a trusted network**, put authentication in front of the whole directory (nginx `auth_basic`) and serve it over TLS. The built-in password protects *writes*; it does not protect *reads*, and it is not a substitute for network-level access control.
@@ -213,15 +222,15 @@ Three pieces, deliberately kept apart:
 
 **`inventory.py`** walks the filesystem and writes three static files — `index.html`, `styles.css`, `app.js`. It talks to nothing, needs no network, and imports only the standard library. Run it by hand anywhere; it drops a `claude_inventory_site/` next to you.
 
-**`api.php`** is the only dynamic part, reached at exactly one URL. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
+**`api.py`** is the only dynamic part, reached at exactly one URL. It is a small JSON service speaking HTTP over a Unix socket, started by systemd and proxied by nginx at `/claude-inventory/api`. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
 
 **`regenerate.sh`** ties them together: runs the generator, copies the output to the web root, records status. Cron calls it daily; a one-minute watcher calls it when the page requests a regeneration.
 
 ### Why the Regenerate button takes up to 60 seconds
 
-The PHP pool runs with `exec`, `system`, `shell_exec`, `proc_open` and `popen` **disabled**. That is the point: the web backend cannot spawn a process, so a bug in it cannot become command execution.
+The backend service runs under a systemd syscall filter that denies the process-spawning family outright. That is the point: the web-facing process cannot exec anything, so a bug in it cannot become command execution.
 
-Regeneration therefore does not run in PHP. The button writes a request file; the one-minute cron consumes it and runs the generator as your user. The cost is up to a minute of latency. The benefit is that the web-facing code never gains the ability to execute anything.
+Regeneration therefore does not run in the backend. The button writes a request file; the one-minute cron consumes it and runs the generator as your user. The cost is up to a minute of latency. The benefit is a web-facing process that is structurally incapable of running a command.
 
 ---
 
@@ -229,9 +238,11 @@ Regeneration therefore does not run in PHP. The button writes a request file; th
 
 This tool writes to a directory whose contents Claude Code later executes. It is built accordingly.
 
-**The web server user gets nothing.** A typical `$HOME` is `750` and `~/.claude` is `700` — `www-data` cannot even traverse them, and this tool does not change that. Instead, `api.php` runs in its own PHP-FPM pool as *you*. No `chmod`, no `setfacl`, no group membership. Zero permission changes anywhere on the filesystem.
+**The web server user gets nothing.** A typical `$HOME` is `750` and `~/.claude` is `700` — `www-data` cannot even traverse them, and this tool does not change that. Instead, the backend runs as *you*, under systemd, and nginx reaches it only through a Unix socket. No `chmod`, no `setfacl`. Zero permission changes anywhere on the filesystem.
 
-**The pool is fenced.** `open_basedir` limits it to `~/.claude` and the web root. Process-spawning functions are disabled. `allow_url_fopen` is off. Uploads are capped.
+**The service is fenced by the kernel, not by the interpreter.** The systemd unit sets `ProtectSystem=strict` and `ProtectHome=read-only`, then opens exactly one writable path: `~/.claude`. It adds `NoNewPrivileges`, an empty capability bounding set, `PrivateTmp`, `PrivateDevices`, `MemoryDenyWriteExecute`, `RestrictNamespaces`, `ProtectProc=invisible`, a `@system-service` syscall filter and `RestrictAddressFamilies=AF_UNIX` — the process cannot open a network socket at all. Memory is capped at 128 MB and tasks at 16.
+
+This is strictly stronger than the `open_basedir` it replaced: an interpreter setting can be sidestepped by native code; a mount namespace and a seccomp filter cannot.
 
 **Paths are checked twice.** A request names a file relative to `~/.claude`. The path must start with `skills/`, `agents/` or `commands/`, must end in `.md`, and must contain no `..`. It is then resolved with `realpath()` and re-checked against the allowed root — which catches a symlink pointing outside.
 
@@ -251,8 +262,8 @@ Most behaviour is deliberately not configurable — fewer knobs, fewer ways to g
 
 | What | Where | Default |
 |---|---|---|
-| Revisions kept per file | `KEEP_REVISIONS` in `api.php` | 10 |
-| Max file size | `MAX_BYTES` in `api.php` | 1 MB |
+| Revisions kept per file | `KEEP_REVISIONS` in `api.py` | 10 |
+| Max file size | `MAX_BYTES` in `api.py` | 1 MB |
 | Daily regeneration time | crontab of your user | 06:22 |
 | Categories and rules | `CATEGORY_LABEL`, `CATEGORY_MAP`, `CATEGORY_RULES` in `inventory.py` | eight categories |
 | Projects scanned | `PROJECT_ROOTS` in `inventory.py` | `/opt/*/.claude` |
@@ -306,11 +317,11 @@ Neither form touches your skills, agents or commands. Without `--purge`, your pa
 
 ## Troubleshooting
 
-**`Backend unavailable (api.php)` in the editor**
-The nginx route or the PHP-FPM pool is missing. Run `bash setup.sh --check`.
+**`Backend unavailable` in the editor**
+The service is down or the nginx route is missing. Run `bash setup.sh --check`, then `systemctl status harness-library` and `journalctl -u harness-library -n 50`.
 
-**`Wrong password` right after changing it**
-Should not happen: the hash is stored as plain data precisely so PHP's opcache is not in the path. If it does, check that `~/.claude/.inventory/auth.hash` was actually rewritten.
+**`Password stored in the old bcrypt format`**
+You upgraded from the PHP backend. Run `sudo bash setup.sh` once; it asks for the password again and stores it with scrypt.
 
 **The page shows old content**
 It is a static file. Click ↻ and wait up to 60 seconds, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron: `crontab -l`.
@@ -324,8 +335,8 @@ Only files under your own `~/.claude/skills|agents|commands` are. Plugin and pro
 **`Incomplete frontmatter` when saving**
 Working as intended. Skills and agents need `name` and `description`; without them Claude Code silently refuses to load the resource.
 
-**API returns HTTP 500**
-Usually `open_basedir`: the pool can only see `~/.claude` and the web root. Anything the backend touches must live inside those.
+**Backend returns HTTP 500 or 502**
+502 means nginx cannot reach the socket — check that the service is running and that `/run/harness-library/sock` exists. 500 is usually the sandbox: the unit grants write access to `~/.claude` and nothing else, so anything the backend touches must live inside it.
 
 ---
 
@@ -337,11 +348,12 @@ my-Harness-Library/
 ├── README.md
 ├── LICENSE
 └── src/
-    ├── inventory.py        scanner and static-site generator
-    ├── api.php             read/write backend (the only dynamic endpoint)
-    ├── regenerate.sh       generate + publish + record status
-    ├── setup.sh            dependency check and installer
-    └── uninstall.sh        clean removal
+    ├── inventory.py                 scanner and static-site generator
+    ├── api.py                       read/write backend (the only dynamic endpoint)
+    ├── harness-library.service.in   systemd unit template (the isolation lives here)
+    ├── regenerate.sh                generate + publish + record status
+    ├── setup.sh                     dependency check and installer
+    └── uninstall.sh                 clean removal
 ```
 
 Nothing is generated at build time and no dependency is vendored. What you read is what runs.
@@ -357,10 +369,9 @@ Inline code comments are in Portuguese; the README, the UI and all installer out
 Before opening a PR:
 
 ```bash
-php -l src/api.php
-bash -n src/setup.sh && bash -n src/regenerate.sh && bash -n src/uninstall.sh
-python3 -m py_compile src/inventory.py
-node --check "$(python3 src/inventory.py >/dev/null && echo claude_inventory_site/app.js)"
+bash -n install.sh src/setup.sh src/regenerate.sh src/uninstall.sh
+python3 -m py_compile src/inventory.py src/api.py
+python3 src/inventory.py && node --check claude_inventory_site/app.js
 ```
 
 CI runs exactly these checks.

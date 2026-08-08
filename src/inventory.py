@@ -2113,7 +2113,7 @@ themeBtn.addEventListener('click', () => {
    modal, que le e grava pelo api.php (gravacao exige senha).
 ====================================================================== */
 
-const API = 'api.php';
+const API = 'api';        // proxied by nginx to the Python backend
 
 const modal    = document.getElementById('editor');
 const edTitle  = document.getElementById('ed-title');

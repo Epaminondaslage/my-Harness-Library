@@ -24,17 +24,19 @@ crontab -u "$TARGET_USER" -l 2>/dev/null | grep -v 'regenerate.sh' \
   | grep -v '# Harness Library' | grep -v "# Serves the page's Regenerate" \
   | crontab -u "$TARGET_USER" - && echo "  ok"
 
-echo "== Removing PHP-FPM pool =="
-PHPVER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)"
-rm -f "/etc/php/$PHPVER/fpm/pool.d/claude-inventory.conf" && echo "  ok"
+echo "== Stopping and removing the backend service =="
+systemctl disable --now harness-library >/dev/null 2>&1
+rm -f /etc/systemd/system/harness-library.service
+systemctl daemon-reload
+echo "  ok"
 
 echo "== Removing nginx route =="
-VHOST="$(grep -rls 'claude-inventory/api.php' /etc/nginx/sites-available/ 2>/dev/null | head -1)"
+VHOST="$(grep -rls 'claude-inventory/api' /etc/nginx/sites-available/ 2>/dev/null | head -1)"
 if [[ -n "$VHOST" ]]; then
   cp -a "$VHOST" "$VHOST.bak-$(date +%Y%m%d-%H%M%S)"
   # Drops the location block and the two comment lines above it.
   awk '
-    /# Harness Library editor/            { skip=1 }
+    /# My Harness Library backend/        { skip=1 }
     skip && /^[[:space:]]*\}/             { skip=0; next }
     !skip                                 { print }
   ' "$VHOST.bak-"* > "$VHOST"
@@ -59,9 +61,8 @@ else
   echo "  use --purge to remove these too"
 fi
 
-echo "== Reloading services =="
+echo "== Reloading nginx =="
 nginx -t && systemctl reload nginx
-systemctl reload "php$PHPVER-fpm" 2>/dev/null
 
 echo
 echo "Done. Your skills, agents and commands were not touched."
