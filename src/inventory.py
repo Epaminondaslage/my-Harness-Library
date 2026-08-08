@@ -1296,7 +1296,7 @@ def build_site(items: list) -> None:
               title="Regenerar o inventário agora">↻</button>
       <button id="new-btn" class="new-btn" type="button"
               {bit("Criar skill, agent ou command", "Create skill, agent or command")}
-              title="Criar skill, agent ou command"><span {bi("＋ Novo", "＋ New")}>＋ Novo</span></button>
+              title="Criar skill, agent ou command"><span {bi("+ Novo", "+ New")}>+ Novo</span></button>
       <button id="theme-toggle" class="theme-toggle" type="button"
               aria-label="Alternar tema claro/escuro"
               {bit("Alternar tema claro/escuro", "Toggle light/dark theme")}

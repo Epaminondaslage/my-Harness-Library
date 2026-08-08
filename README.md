@@ -137,8 +137,9 @@ English and Portuguese, switched by the flag in the header, no reload. Light and
   <img alt="My Harness Library: 248 resources, filtered by Installed, with type tabs, source and purpose filters, and resource cards" src="docs/screenshot-light.png">
 </picture>
 
-*Filtered to **Installed 52**: every card shown is something Claude Code actually
-loads. The other 183 sit in a marketplace catalogue, waiting to be installed.*
+*Filtered to **Installed 52** and sorted by **Most stars**: every card shown is
+something Claude Code actually loads, and the plugin card carries its
+repository's health. The other 183 sit in a marketplace catalogue.*
 
 The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
 
