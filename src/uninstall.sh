@@ -14,7 +14,7 @@ PURGE=0
 
 TARGET_USER="${SUDO_USER:-$(id -un)}"
 TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-WEBROOT="/var/www/html/claude-inventory"
+WEBROOT="/var/www/html/my-harness-library"
 STATE="$TARGET_HOME/.claude/.inventory"
 
 [[ $EUID -eq 0 ]] || { echo "Root required: sudo bash $0"; exit 1; }
@@ -31,7 +31,8 @@ systemctl daemon-reload
 echo "  ok"
 
 echo "== Removing nginx route =="
-VHOST="$(grep -rls 'claude-inventory/api' /etc/nginx/sites-available/ 2>/dev/null | head -1)"
+VHOST="$(grep -rls 'my-harness-library/api' /etc/nginx/sites-enabled/ 2>/dev/null \
+                 | xargs -r -n1 readlink -f | sort -u | head -1)"
 if [[ -n "$VHOST" ]]; then
   cp -a "$VHOST" "$VHOST.bak-$(date +%Y%m%d-%H%M%S)"
   # Drops the location block and the two comment lines above it.

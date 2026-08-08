@@ -114,7 +114,7 @@ second runtime, no package manifest and no dependency to keep patched.
 
 Tested on Ubuntu 24.04 with Python 3.12 and nginx 1.24. The installer checks all of the above and installs what is missing via `apt`.
 
-The page is served from `/var/www/html/claude-inventory` by your existing nginx. If nothing is serving `/var/www/html` yet, the installer falls back to the default site.
+The page is served from `/var/www/html/my-harness-library` by your existing nginx. If nothing is serving `/var/www/html` yet, the installer falls back to the default site.
 
 ---
 
@@ -222,7 +222,7 @@ Three pieces, deliberately kept apart:
 
 **`inventory.py`** walks the filesystem and writes three static files — `index.html`, `styles.css`, `app.js`. It talks to nothing, needs no network, and imports only the standard library. Run it by hand anywhere; it drops a `claude_inventory_site/` next to you.
 
-**`api.py`** is the only dynamic part, reached at exactly one URL. It is a small JSON service speaking HTTP over a Unix socket, started by systemd and proxied by nginx at `/claude-inventory/api`. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
+**`api.py`** is the only dynamic part, reached at exactly one URL. It is a small JSON service speaking HTTP over a Unix socket, started by systemd and proxied by nginx at `/my-harness-library/api`. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
 
 **`regenerate.sh`** ties them together: runs the generator, copies the output to the web root, records status. Cron calls it daily; a one-minute watcher calls it when the page requests a regeneration.
 

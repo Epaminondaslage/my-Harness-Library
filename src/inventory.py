@@ -235,7 +235,7 @@ def repo_from_github_search(name: str, kind: str) -> str:
     repo = ""
     if ONLINE:
         headers = {"Accept": "application/vnd.github+json",
-                   "User-Agent": "claude-inventory"}
+                   "User-Agent": "my-harness-library"}
         if GITHUB_TOKEN:
             headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
         q = urllib.parse.quote(f"{name} claude {kind}")

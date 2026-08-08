@@ -14,8 +14,8 @@ set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$HOME/.cache/harness-library"
-DEST="/var/www/html/claude-inventory"
-# Same directory api.php can see (open_basedir covers ~/.claude)
+DEST="/var/www/html/my-harness-library"
+# Same directory the backend can see (its unit grants ~/.claude only)
 STATE="$HOME/.claude/.inventory"
 STATUS="$STATE/status.json"
 REQUEST="$STATE/regen.request"

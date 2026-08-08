@@ -28,7 +28,7 @@ DEFAULT_PASSWORD="change-me-now"
 # The environment owner is whoever called sudo, not root.
 TARGET_USER="${SUDO_USER:-$(id -un)}"
 TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-WEBROOT="/var/www/html/claude-inventory"
+WEBROOT="/var/www/html/my-harness-library"
 STATE="$TARGET_HOME/.claude/.inventory"
 UNIT=/etc/systemd/system/harness-library.service
 
@@ -90,7 +90,7 @@ step "Environment"
 step "Current installation"
 [[ -f "$UNIT" ]] && ok "systemd unit installed" || warn "systemd unit absent"
 systemctl is-active --quiet harness-library 2>/dev/null && ok "backend running" || warn "backend not running"
-grep -rqs 'claude-inventory/api' /etc/nginx/sites-available/ && ok "nginx route configured" || warn "nginx route absent"
+grep -rqs 'my-harness-library/api' /etc/nginx/sites-enabled/ && ok "nginx route configured" || warn "nginx route absent"
 if [[ -f "$STATE/auth.hash" ]]; then
   if head -c 3 "$STATE/auth.hash" | grep -q '^\$2'; then
     warn "password stored in the old bcrypt format — will be reset below"
@@ -145,20 +145,21 @@ chmod 644 "$UNIT"
 systemctl daemon-reload
 ok "$UNIT"
 
-step "Removing the old PHP backend, if present"
+step "Removing the previous installation, if present"
 # Upgrade path from the PHP version: drop its nginx location block and its
 # FPM pool. Harmless no-op on a fresh install.
-LEGACY_VHOST="$(grep -rls 'claude-inventory/api\.php' /etc/nginx/sites-available/ 2>/dev/null | head -1)"
+LEGACY_VHOST="$(grep -rls 'claude-inventory/api' /etc/nginx/sites-enabled/ 2>/dev/null \
+                 | xargs -r -n1 readlink -f | sort -u | head -1)"
 if [[ -n "$LEGACY_VHOST" ]]; then
   cp -a "$LEGACY_VHOST" "$LEGACY_VHOST.bak-php-$(date +%Y%m%d-%H%M%S)"
   awk '
-    /claude-inventory\/api\.php \{/ { skip=1; next }
+    /claude-inventory\/api(\.php)? \{/ { skip=1; next }
     skip && /^[[:space:]]*\}/       { skip=0; next }
     skip                            { next }
     /# Editor do inventario Claude Code|# Harness Library editor|# Match exato|# over any regex location block|# prioridade sobre qualquer regex/ { next }
     { print }
   ' "$LEGACY_VHOST.bak-php-"* > "$LEGACY_VHOST"
-  ok "old api.php route removed from $LEGACY_VHOST"
+  ok "old /claude-inventory route removed from $LEGACY_VHOST"
 fi
 for pool in /etc/php/*/fpm/pool.d/claude-inventory.conf; do
   [[ -f "$pool" ]] || continue
@@ -169,12 +170,28 @@ for pool in /etc/php/*/fpm/pool.d/claude-inventory.conf; do
 done
 
 step "nginx route"
-VHOST="$(grep -rls 'root */var/www/html' /etc/nginx/sites-available/ 2>/dev/null | head -1)"
+# Only sites-ENABLED counts: sites-available also holds backups, and writing
+# the route into one of those produces a 404 that looks like a code bug.
+# Symlinks are resolved so the edit lands on the real file.
+pick_vhost() {
+  local link real tls="" first=""
+  for link in /etc/nginx/sites-enabled/*; do
+    [[ -e "$link" ]] || continue
+    real="$(readlink -f "$link")"
+    [[ -f "$real" ]] || continue
+    grep -qs 'root[[:space:]]*/var/www/html;' "$real" || continue
+    [[ -z "$first" ]] && first="$real"
+    if [[ -z "$tls" ]] && grep -qs 'listen[[:space:]]*443' "$real"; then tls="$real"; fi
+  done
+  echo "${tls:-$first}"                 # prefer the TLS vhost when there is one
+}
+VHOST="$(pick_vhost)"
 if [[ -z "$VHOST" ]]; then
-  warn "no site serving /var/www/html; falling back to the default site"
+  warn "no enabled site serving /var/www/html; falling back to the default site"
   VHOST=/etc/nginx/sites-available/default
 fi
-if grep -q 'claude-inventory/api' "$VHOST"; then
+ok "target vhost: $VHOST"
+if grep -q 'my-harness-library/api' "$VHOST"; then
   ok "already present in $VHOST"
 else
   BACKUP="$VHOST.bak-$(date +%Y%m%d-%H%M%S)"
@@ -184,7 +201,7 @@ else
       print; print ""
       print "    # My Harness Library backend. An exact (=) match takes priority"
       print "    # over any regex location block."
-      print "    location = /claude-inventory/api {"
+      print "    location = /my-harness-library/api {"
       print "        proxy_pass http://unix:/run/harness-library/sock:/;"
       print "        proxy_set_header X-Real-IP $remote_addr;"
       print "        proxy_set_header Host $host;"
@@ -200,8 +217,11 @@ fi
 step "Publishing files"
 install -d -o "$TARGET_USER" -g www-data -m 2775 "$WEBROOT"
 install -d -o "$TARGET_USER" -g "$TARGET_USER" -m 700 "$STATE"
-# The old PHP endpoint, if this is an upgrade.
-rm -f "$WEBROOT/api.php"
+# Remove the previous location entirely, if this is an upgrade.
+if [[ -d /var/www/html/claude-inventory ]]; then
+  rm -rf /var/www/html/claude-inventory
+  ok "old web root /var/www/html/claude-inventory removed"
+fi
 ok "$WEBROOT"
 
 step "Write password"
@@ -278,11 +298,11 @@ sudo -u "$TARGET_USER" bash "$DIR/regenerate.sh" || warn "generation failed (che
 
 step "Verification"
 IP="$(hostname -I | awk '{print $1}')"
-CODE="$(curl -sk -o /dev/null -w '%{http_code}' "http://$IP/claude-inventory/")"
-API="$(curl -sk -X POST "http://$IP/claude-inventory/api" \
+CODE="$(curl -sk -o /dev/null -w '%{http_code}' "http://$IP/my-harness-library/")"
+API="$(curl -sk -X POST "http://$IP/my-harness-library/api" \
         -H 'Content-Type: application/json' -d '{"action":"status"}' -o /dev/null -w '%{http_code}')"
 [[ "$CODE" =~ ^(200|301)$ ]] && ok "page responds ($CODE)" || bad "page responded $CODE"
 [[ "$API" == "200" ]] && ok "backend responds (200)" || bad "backend responded $API"
 
 echo
-echo "${GRN}Done.${OFF}  http://$IP/claude-inventory/"
+echo "${GRN}Done.${OFF}  http://$IP/my-harness-library/"
