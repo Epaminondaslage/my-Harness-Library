@@ -361,7 +361,7 @@ def collect_skills() -> list:
             "desc": fm.get("description") or first_paragraph(text) or "Sem descricao.",
             "meta": str(skill_md.parent.relative_to(BASE)),
             "path": str(skill_md.parent),
-            # Caminho relativo a BASE — chave usada pelo editor (api.php)
+            # Caminho relativo a BASE — chave usada pelo editor
             "rel": str(skill_md.relative_to(BASE)),
             "scope": "meu",
             "origin": "",
@@ -489,7 +489,7 @@ def collect_plugins() -> list:
 #
 # Nenhum dos dois e editavel pela pagina: plugin e sobrescrito na proxima
 # atualizacao do marketplace, e projeto sujaria a arvore do repositorio.
-# A allowlist do api.php ja barra ambos por construcao.
+# A allowlist do backend ja barra ambos por construcao.
 
 # Projetos varridos. /opt/helpdesk fica de fora de proposito: e projeto de
 # outra pessoa, e a regra da casa e nao tocar nele — nem para listar.
@@ -1063,7 +1063,7 @@ def build_site(items: list) -> None:
 
   <!-- ===================================================================
        Editor de markdown (modal). Abre ao clicar num card de arquivo .md
-       sob ~/.claude. Grava via api.php, que exige senha.
+       sob ~/.claude. Grava pelo backend, que exige senha.
   ==================================================================== -->
   <div id="editor" class="modal" hidden>
     <div class="modal-backdrop" data-close></div>
@@ -1919,7 +1919,7 @@ const MSG = {
     loading:       'Carregando...',
     ready:         'Pronto.',
     readonly:      'Arquivo somente leitura no servidor.',
-    backendDown:   'Backend indisponível (api.php).',
+    backendDown:   'Backend indisponível.',
     needPass:      'Informe a senha para salvar.',
     needPassRest:  'Informe a senha para restaurar.',
     saving:        'Salvando...',
@@ -1960,7 +1960,7 @@ const MSG = {
     loading:       'Loading...',
     ready:         'Ready.',
     readonly:      'File is read-only on the server.',
-    backendDown:   'Backend unavailable (api.php).',
+    backendDown:   'Backend unavailable.',
     needPass:      'Enter the password to save.',
     needPassRest:  'Enter the password to restore.',
     saving:        'Saving...',
@@ -2110,7 +2110,7 @@ themeBtn.addEventListener('click', () => {
 /* =====================================================================
    Editor de markdown
    Cards com data-rel apontam para um .md sob ~/.claude. Clicar abre o
-   modal, que le e grava pelo api.php (gravacao exige senha).
+   modal, que le e grava pelo backend (gravacao exige senha).
 ====================================================================== */
 
 const API = 'api';        // proxied by nginx to the Python backend

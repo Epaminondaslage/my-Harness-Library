@@ -320,9 +320,6 @@ Neither form touches your skills, agents or commands. Without `--purge`, your pa
 **`Backend unavailable` in the editor**
 The service is down or the nginx route is missing. Run `bash setup.sh --check`, then `systemctl status harness-library` and `journalctl -u harness-library -n 50`.
 
-**`Password stored in the old bcrypt format`**
-You upgraded from the PHP backend. Run `sudo bash setup.sh` once; it asks for the password again and stores it with scrypt.
-
 **The page shows old content**
 It is a static file. Click ↻ and wait up to 60 seconds, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron: `crontab -l`.
 

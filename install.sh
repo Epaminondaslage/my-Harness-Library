@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/main/install.sh | sudo bash
 #
 # Downloads the sources to /opt/harness-library and hands over to setup.sh,
-# which does the actual work (dependency check, PHP-FPM pool, nginx route,
+# which does the actual work (dependency check, systemd service, nginx route,
 # cron, first generation).
 #
 # Environment variables:
