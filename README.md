@@ -110,6 +110,16 @@ English and Portuguese, switched by the flag in the header, no reload. Light and
 
 ## Screenshot tour
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+  <img alt="My Harness Library: 248 resources, filtered by Installed, with type tabs, source and purpose filters, and resource cards" src="docs/screenshot-light.png">
+</picture>
+
+*The Source row is filtered to **Installed 52**, so every card shown is something
+Claude Code actually loads — the other 183 sit in a marketplace catalogue. The
+host, directory and user of the machine that generated this page are blurred
+here; on your own install they read plainly.*
+
 The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
 
 Below it, a provenance card shows which host, which directory and which user this inventory came from — so a page shared between machines is never ambiguous.
