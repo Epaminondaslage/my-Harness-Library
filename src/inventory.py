@@ -450,8 +450,20 @@ def collect_plugins() -> list:
         except (OSError, json.JSONDecodeError):
             continue
         name = data.get("name", pj.parent.name)
-        if name in seen:
+
+        inst = installed_owner(pj)
+        pkg_scope = "instalado" if inst else "disponivel"
+        pkg_version = inst[1] if inst else data.get("version", "")
+
+        # Descarta versao antiga no cache e clone temporario: so entra o que
+        # esta instalado ou o que aparece no catalogo de um marketplace.
+        if not inst and "marketplaces" not in pj.parts:
             continue
+        # Instalado vence o catalogo para o mesmo nome de plugin.
+        if name in seen:
+            if pkg_scope != "instalado":
+                continue
+            items[:] = [i for i in items if not (i["type"] == "plugin" and i["name"] == name)]
         seen.add(name)
 
         # Camada (b): manifest do plugin pode declarar o repositorio
@@ -466,9 +478,9 @@ def collect_plugins() -> list:
             "type": "plugin",
             "name": name,
             "desc": data.get("description", "Sem descricao."),
-            "meta": f"versao: {data.get('version', '?')} · {author}".strip(" ·"),
+            "meta": f"versao: {pkg_version or '?'} · {author}".strip(" ·"),
             "path": str(pj.parent),
-            "scope": "pacote",
+            "scope": pkg_scope,
             "origin": "",
             "cat_declared": data.get("category", ""),
             "repo": repo,
@@ -497,6 +509,57 @@ PROJECT_ROOTS = sorted(
     p for p in Path("/opt").glob("*/.claude")
     if p.is_dir() and p.parent.name != "helpdesk"
 )
+
+
+# -----------------------------------------------------------------------------
+# Instalado x disponivel
+# -----------------------------------------------------------------------------
+# ~/.claude/plugins guarda duas coisas bem diferentes na mesma arvore:
+#
+#   marketplaces/<mkt>/...      catalogo — o que EXISTE para instalar
+#   cache/<mkt>/<plugin>/<ver>/ copias instaladas, uma por versao ja baixada
+#
+# Varrer tudo em bloco confunde as duas e ainda conta a mesma skill varias
+# vezes (versao antiga no cache + copia do catalogo). O manifesto
+# installed_plugins.json diz exatamente qual caminho esta ativo, entao ele e
+# a fonte da verdade sobre o que o Claude Code carrega de fato.
+
+INSTALLED: list = []          # [(Path do installPath, nome do plugin, versao)]
+
+
+def load_installed_plugins() -> list:
+    """Le installed_plugins.json e devolve os caminhos ativos."""
+    f = BASE / "plugins" / "installed_plugins.json"
+    if not f.is_file():
+        return []
+    try:
+        data = json.loads(f.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    out, vistos = [], set()
+    for chave, entradas in (data.get("plugins") or {}).items():
+        nome = chave.split("@")[0]
+        for e in entradas or []:
+            caminho = e.get("installPath", "")
+            if not caminho or caminho in vistos:
+                continue
+            vistos.add(caminho)
+            p = Path(caminho)
+            if p.is_dir():
+                out.append((p, nome, e.get("version", "")))
+    return out
+
+
+def installed_owner(path: Path):
+    """(nome, versao) se o arquivo pertence a um plugin instalado; senao None."""
+    for raiz, nome, versao in INSTALLED:
+        try:
+            if path.is_relative_to(raiz):
+                return nome, versao
+        except ValueError:
+            continue
+    return None
 
 
 def plugin_owner(path: Path, plugins_root: Path) -> str:
@@ -578,35 +641,55 @@ def collect_from_claude_dir(base: Path, scope: str, origin: str) -> list:
 
 def collect_plugin_resources() -> list:
     """
-    Skills, agents e commands que moram dentro dos plugins instalados.
-    Varre por arquivo (nao por diretorio .claude) porque o layout do
-    marketplace varia: alguns plugins expoem skills/ na raiz, outros
-    dentro de plugins/<nome>/.
+    Skills, agents e commands que moram dentro dos plugins.
+
+    Cada arquivo cai em um de tres destinos:
+      instalado  — esta sob um installPath do manifesto; e o que roda
+      disponivel — esta no catalogo de um marketplace, nao instalado
+      descartado — copia de versao antiga no cache, ou clone temporario
+
+    Quando o mesmo recurso aparece instalado E no catalogo, fica so a versao
+    instalada: sao o mesmo arquivo em dois lugares, nao dois recursos.
     """
     root = BASE / "plugins"
     if not root.is_dir():
         return []
 
     items = []
-    seen = set()
+    vistos = {}                 # (tipo, nome, plugin) -> indice em items
 
     def add(md: Path, kind: str, anchor: Path) -> None:
-        key = str(md.resolve())
-        if key in seen:
+        inst = installed_owner(md)
+        if inst:
+            nome, versao = inst
+            scope = "instalado"
+            origin = f"{nome} {versao}" if versao else nome
+            base_owner = nome
+        elif "marketplaces" in md.parts:
+            scope = "disponivel"
+            base_owner = plugin_owner(md, root)
+            origin = base_owner
+        else:
+            return              # versao antiga no cache, ou temp_git_*
+
+        it = md_item(md, kind, scope, origin, anchor)
+        if not it:
             return
-        seen.add(key)
-        it = md_item(md, kind, "plugin", plugin_owner(md, root), anchor)
-        if it:
+
+        chave = (kind, it["name"], base_owner)
+        anterior = vistos.get(chave)
+        if anterior is None:
+            vistos[chave] = len(items)
             items.append(it)
+        elif scope == "instalado" and items[anterior]["scope"] != "instalado":
+            items[anterior] = it        # instalado sempre vence o catalogo
 
     for md in sorted(root.rglob("SKILL.md")):
         add(md, "skill", md.parent.parent)
     for md in sorted(root.rglob("*.md")):
-        parts = md.parts
         if "/agents/" in str(md):
             add(md, "agent", md.parent)
         elif "/commands/" in str(md):
-            # ancora = o diretorio commands/ mais proximo, para o nome /sub:cmd
             anchor = md.parent
             while anchor.name != "commands" and anchor.parent != anchor:
                 anchor = anchor.parent
@@ -654,7 +737,7 @@ def collect_mcps() -> list:
                         break
         return {"type": "mcp", "name": name, "desc": desc or "Configuracao nao reconhecida.",
                 "meta": scope, "path": "", "npm_pkg": npm_pkg, "repo": "",
-                "scope": "pacote", "origin": ""}
+                "scope": "meu", "origin": ""}
 
     for name, cfg in (data.get("mcpServers") or {}).items():
         items.append(make(name, cfg, "escopo: global (user)"))
@@ -859,7 +942,8 @@ CATEGORY_EN = {
     "outros":      "Other",
 }
 
-SCOPE_EN = {"meu": "Mine", "plugin": "From plugin", "projeto": "From project", "pacote": "Packages"}
+SCOPE_EN = {"meu": "Mine", "instalado": "Installed",
+            "disponivel": "Available", "projeto": "From project"}
 
 
 def build_site(items: list) -> None:
@@ -940,7 +1024,8 @@ def build_site(items: list) -> None:
                         f'<span>{counts[t]}</span></button>')
 
     # ---- Chips de filtro por escopo (de onde o recurso vem) -------------
-    SCOPE_LABEL = {"meu": "Meus", "plugin": "De plugin", "projeto": "De projeto", "pacote": "Pacotes"}
+    SCOPE_LABEL = {"meu": "Meus", "instalado": "Instalados",
+                   "disponivel": "Disponíveis", "projeto": "De projeto"}
     scope_counts = {s: sum(1 for i in items if i.get("scope", "meu") == s) for s in SCOPE_LABEL}
     scopes = [f'<button class="chip active" data-scope="all">'
               f'<span {bi("Todos", "All")}>Todos</span></button>']
@@ -1484,8 +1569,13 @@ body {
   vertical-align: middle;
   white-space: nowrap;
 }
-.origin-chip.scope-plugin  { background: var(--c-ferramental-bg); color: var(--c-ferramental-fg); }
-.origin-chip.scope-projeto { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
+.origin-chip.scope-instalado  { background: var(--c-ferramental-bg); color: var(--c-ferramental-fg); }
+.origin-chip.scope-disponivel { background: var(--c-outros-bg);      color: var(--c-outros-fg); }
+.origin-chip.scope-projeto    { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
+
+/* Recurso apenas catalogado fica visualmente mais fraco que o instalado. */
+.card[data-scope="disponivel"] { opacity: .82; border-left-color: var(--border-str); }
+.card[data-scope="disponivel"]:hover { opacity: 1; }
 
 /* ---- Grade de cards brancos ---- */
 .grid {
@@ -2791,6 +2881,12 @@ document.addEventListener('keydown', ev => {
 def main():
     print(f"[*] Varrendo: {BASE}")
     print(f"[*] Modo online (npm + GitHub API): {'SIM' if ONLINE else 'NAO (use --online)'}")
+
+    # O manifesto precisa estar carregado ANTES dos coletores: e ele que
+    # separa instalado de catalogo.
+    global INSTALLED
+    INSTALLED = load_installed_plugins()
+    print(f"[*] Plugins instalados (installed_plugins.json): {len(INSTALLED)}")
 
     items = (collect_skills() + collect_agents() + collect_commands()
              + collect_plugins() + collect_mcps()

@@ -6,7 +6,7 @@ Claude Code accumulates capability fast. You install a plugin and get thirty ski
 
 My Harness Library scans that tree — plus every installed plugin and every project-local `.claude/` — and publishes a single static page: every skill, agent, command, plugin and MCP server, each classified by purpose, each linked to the GitHub repository it came from, all searchable in one box.
 
-On a typical installation the difference is stark: the Claude Code plugin list shows **58 plugins**; My Harness Library shows the **310 individual resources** inside them.
+On a typical installation the difference is stark: the Claude Code plugin list shows **58 plugins**; My Harness Library shows the **248 individual resources** inside them — and tells you which **52** are actually installed and loadable, versus the **183** that merely sit in a marketplace catalogue waiting to be installed.
 
 ---
 
@@ -38,12 +38,28 @@ Five sources are scanned:
 | Source | What is found |
 |---|---|
 | `~/.claude/skills`, `/agents`, `/commands` | the resources you wrote yourself |
-| `~/.claude/plugins/**` | every skill, agent and command *inside* each installed plugin |
+| `~/.claude/plugins/**` | every skill, agent and command *inside* each plugin |
 | `~/.claude.json` | MCP servers, global and per-project |
 | plugin manifests | the plugin packages themselves |
 | `<project>/.claude/**` | skills versioned inside your repositories |
 
-Resources are tagged by origin — **Mine**, **From plugin**, **From project** — because the distinction matters: plugin resources are overwritten on the next marketplace update, and project resources live in git.
+### Separates what is installed from what is merely available
+
+`~/.claude/plugins` holds two very different things in one tree: `marketplaces/`
+is a *catalogue* of everything you could install, while `cache/` holds the copies
+that actually are — one directory per version ever downloaded.
+
+Walking that tree naively conflates the two and counts the same skill several
+times: once from the catalogue, once per cached version. `installed_plugins.json`
+records exactly which path is active, so that is what decides.
+
+Every resource is therefore tagged by origin — **Mine**, **Installed**,
+**Available**, **From project** — and the installed copy always wins when the
+same resource appears in both places. Catalogue entries are dimmed, because they
+are not loaded by anything yet.
+
+The distinction matters beyond bookkeeping: installed plugin resources are
+overwritten on the next marketplace update, and project resources live in git.
 
 ### Classifies by purpose
 
@@ -69,7 +85,7 @@ category: devops
 
 Four layers, again strongest first: the resource directory's `git remote`; a `repository` field in its manifest or frontmatter; the marketplace's declared origin from `known_marketplaces.json`; and, only with `--online`, the npm registry and GitHub search (results from search are labelled *likely*).
 
-Layer three is what makes this work without a network: on a typical installation it resolves **306 of 310** resources exactly, offline, because the marketplace registry records the repository each plugin came from. The four it cannot resolve are the two skills you wrote yourself — which have no repository — and the two MCP servers, whose origin lives in the npm registry. Adding `--online` recovers one of the two MCPs; the other declares no repository upstream.
+Layer three is what makes this work without a network: on a typical installation it resolves **244 of 248** resources exactly, offline, because the marketplace registry records the repository each plugin came from. The four it cannot resolve are the two skills you wrote yourself — which have no repository — and the two MCP servers, whose origin lives in the npm registry. Adding `--online` recovers one of the two MCPs; the other declares no repository upstream.
 
 ### Edits the resources you own
 
@@ -98,7 +114,7 @@ The header carries, left to right: the title, the resource count and generation 
 
 Below it, a provenance card shows which host, which directory and which user this inventory came from — so a page shared between machines is never ambiguous.
 
-Then: a search box, type tabs (`All 310 · Skills 155 · Agents 52 · Commands 43 · Plugins 58 · MCPs 2`), and two rows of filter chips — **Source** and **Purpose**. Filters combine with each other and with the search.
+Then: a search box, type tabs (`All 248 · Skills 108 · Agents 43 · Commands 37 · Plugins 58 · MCPs 2`), and two rows of filter chips — **Source** (`Mine 4 · Installed 52 · Available 183 · From project 9`) and **Purpose**. Filters combine with each other and with the search.
 
 ---
 
@@ -250,7 +266,7 @@ This is strictly stronger than the `open_basedir` it replaced: an interpreter se
 
 **Everything that writes is logged.** `~/.claude/.inventory/audit.log`, one JSON object per line: timestamp, action, file, byte count, client IP, user agent. Rejected password attempts are logged too.
 
-**Only your own files are writable.** Plugin and project resources are read-only, enforced server-side by the allowlist rather than by hiding a button.
+**Only your own files are writable.** Plugin, catalogue and project resources are read-only, enforced server-side by the allowlist rather than by hiding a button.
 
 **What this does not do:** it does not authenticate readers, encrypt anything, rate-limit beyond a fixed delay on a bad password, or defend against someone who already has shell access as you. Treat it as a tool for a trusted network.
 
@@ -323,11 +339,11 @@ The service is down or the nginx route is missing. Run `bash setup.sh --check`, 
 **The page shows old content**
 It is a static file. Click ↻ and wait up to 60 seconds, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron: `crontab -l`.
 
-**`Skills: 2` when you have dozens**
-You are looking at an old build. Current versions scan inside plugins; the count should be in the hundreds.
+**A plugin you installed shows as `Available`**
+The scan trusts `~/.claude/plugins/installed_plugins.json`. If a plugin is installed but its entry is missing or points at a path that no longer exists, its resources fall back to the catalogue. Regenerate after Claude Code finishes installing.
 
 **Nothing is editable**
-Only files under your own `~/.claude/skills|agents|commands` are. Plugin and project resources are read-only by design — filter by **Source → Mine** to see what you can edit.
+Only files under your own `~/.claude/skills|agents|commands` are. Plugin, catalogue and project resources are read-only by design — filter by **Source → Mine** to see what you can edit.
 
 **`Incomplete frontmatter` when saving**
 Working as intended. Skills and agents need `name` and `description`; without them Claude Code silently refuses to load the resource.
