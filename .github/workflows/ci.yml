@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP syntax
+        run: php -l src/api.php
+
+      - name: Shell syntax
+        run: |
+          bash -n install.sh
+          bash -n src/setup.sh
+          bash -n src/regenerate.sh
+          bash -n src/uninstall.sh
+
+      - name: Python syntax
+        run: python3 -m py_compile src/inventory.py
+
+      - name: Generator runs and emits valid JS
+        run: |
+          mkdir -p /tmp/fake/.claude/skills/demo
+          printf -- '---\nname: demo\ndescription: Use when demonstrating\n---\n\n# demo\n' \
+            > /tmp/fake/.claude/skills/demo/SKILL.md
+          python3 src/inventory.py /tmp/fake/.claude
+          test -s claude_inventory_site/index.html
+          node --check claude_inventory_site/app.js
+
+      - name: No secrets committed
+        run: |
+          ! grep -rIE '\$2[aby]\$[0-9]{2}\$|ghp_[A-Za-z0-9]{20}|gho_[A-Za-z0-9]{20}|sk-[A-Za-z0-9]{20}' \
+            --exclude-dir=.git . || { echo "possible secret committed"; exit 1; }

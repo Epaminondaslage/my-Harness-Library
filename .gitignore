@@ -1,0 +1,19 @@
+# Generated output — never committed, always rebuilt
+claude_inventory_site/
+.claude_inventory_cache.json
+last-run.log
+
+# Local state and secrets — must never reach the repository
+*.hash
+auth.php
+audit.log
+status.json
+*.request
+.env
+
+# Editor and OS noise
+*.swp
+*~
+.DS_Store
+__pycache__/
+*.pyc
