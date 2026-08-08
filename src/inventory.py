@@ -875,6 +875,112 @@ def classify(item: dict, declared: str = "") -> str:
     return "outros"
 
 
+# -----------------------------------------------------------------------------
+# Saude dos repositorios de origem
+# -----------------------------------------------------------------------------
+# Os 248 recursos de uma instalacao tipica vem de cerca de 8 repositorios, entao
+# medir "esta vivo?" custa 8 requisicoes, nao 248. O resultado fica em cache no
+# disco: a geracao offline (o cron diario) le o cache, e so o --online atualiza.
+# Sem isso a pagina nao diz nada sobre um marketplace abandonado meses atras.
+
+REPO_HEALTH: dict = {}
+HEALTH_CACHE = None          # definido no main(), depende de BASE
+
+
+def health_cache_path() -> Path:
+    return BASE / ".inventory" / "repo-health.json"
+
+
+def load_repo_health() -> dict:
+    f = health_cache_path()
+    if not f.is_file():
+        return {}
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_repo_health(data: dict) -> None:
+    f = health_cache_path()
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def refresh_repo_health(urls: set) -> dict:
+    """
+    Consulta a API do GitHub para cada repositorio distinto. REST, um por vez:
+    sao poucos, e o limite sem token (60/h) ja cobre. Com GITHUB_TOKEN o teto
+    sobe para 5000/h. Falha de rede nunca derruba a geracao — mantem o cache.
+    """
+    dados = load_repo_health()
+    for url in sorted(urls):
+        m = re.match(r"https://github\.com/([^/]+)/([^/#?]+)", url)
+        if not m:
+            continue
+        headers = {"Accept": "application/vnd.github+json",
+                   "User-Agent": "my-harness-library"}
+        if GITHUB_TOKEN:
+            headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+        info = http_get_json(f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}",
+                             headers=headers)
+        if not info:
+            continue                       # mantem o que ja estava em cache
+        dados[url] = {
+            "stars": info.get("stargazers_count", 0),
+            "pushed": (info.get("pushed_at") or "")[:10],
+            "archived": bool(info.get("archived")),
+            "checked": datetime.now().strftime("%Y-%m-%d"),
+        }
+        time.sleep(0.2 if GITHUB_TOKEN else 1.0)
+    save_repo_health(dados)
+    return dados
+
+
+def dias_desde(iso: str) -> int:
+    """Dias decorridos desde uma data ISO (yyyy-mm-dd); -1 se invalida."""
+    try:
+        d = datetime.strptime(iso[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return -1
+    return max(0, (datetime.now() - d).days)
+
+
+def health_badge(repo: str) -> tuple:
+    """
+    (html do selo, estrelas, dias desde o ultimo push) para um repositorio.
+    Devolve ("", 0, -1) quando nao ha dado — a pagina simplesmente omite.
+    """
+    h = REPO_HEALTH.get(repo)
+    if not h:
+        return "", 0, -1
+
+    estrelas = int(h.get("stars", 0))
+    dias = dias_desde(h.get("pushed", ""))
+    sel = []
+
+    if estrelas:
+        s = f"{estrelas/1000:.1f}k".replace(".0k", "k") if estrelas >= 1000 else str(estrelas)
+        sel.append(f'<span class="hl-stars" title="{estrelas} stars">★ {s}</span>')
+
+    if dias >= 0:
+        if dias <= 30:
+            cls, pt, en = "hl-fresh", "ativo", "active"
+        elif dias <= 180:
+            cls, pt, en = "hl-ok", f"{dias // 30} meses", f"{dias // 30}mo"
+        else:
+            cls, pt, en = "hl-stale", f"parado há {dias // 30} meses", f"idle {dias // 30}mo"
+        sel.append(f'<span class="hl-age {cls}" {bi(pt, en)}>{pt}</span>')
+
+    if h.get("archived"):
+        sel.append(f'<span class="hl-age hl-stale" {bi("arquivado", "archived")}>arquivado</span>')
+
+    return (f'<span class="health">{"".join(sel)}</span>' if sel else ""), estrelas, dias
+
+
 def host_ip() -> str:
     """
     IP da maquina que gerou o inventario. Abre um socket UDP para um destino
@@ -999,9 +1105,18 @@ def build_site(items: list) -> None:
                        if origin else "")
         searchable = f"{searchable} {origin}".strip().lower()
 
+        # Saude do repositorio de origem. O selo so aparece no card de plugin:
+        # em 148 recursos que apontam para o mesmo repositorio ele seria a
+        # mesma informacao repetida 148 vezes. Os atributos, porem, vao em
+        # todos, porque a ordenacao usa esses numeros.
+        badge_saude, estrelas, dias = health_badge(it.get("repo", ""))
+        if it["type"] != "plugin":
+            badge_saude = ""
+
         cards.append(f"""
       <article class="card{edit_cls}" data-type="{it['type']}" data-cat="{cat}"
-               data-scope="{scope}"{edit_attrs}
+               data-scope="{scope}" data-stars="{estrelas}" data-age="{dias}"
+               data-name="{html.escape(it['name'].lower(), quote=True)}"{edit_attrs}
                data-search="{html.escape(searchable, quote=True)}">
         <div class="card-head">
           <span class="card-name">{html.escape(it['name'])}{origin_html}</span>
@@ -1011,7 +1126,7 @@ def build_site(items: list) -> None:
           </span>
         </div>
         <p class="card-desc">{html.escape(it['desc'])}</p>
-        <p class="card-meta">{html.escape(it['meta'])}{repo_html}{edit_hint}</p>
+        <p class="card-meta">{html.escape(it['meta'])}{badge_saude}{repo_html}{edit_hint}</p>
       </article>""")
 
     # ---- Abas de filtro por tipo ----------------------------------------
@@ -1135,6 +1250,15 @@ def build_site(items: list) -> None:
       <div class="filter-row">
         <span class="filter-label" {bi("Finalidade", "Purpose")}>Finalidade</span>
         <div class="chips">{''.join(cat_chips)}</div>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label" {bi("Ordenar", "Sort")}>Ordenar</span>
+        <div class="chips">
+          <button class="chip active" data-sort="padrao" {bi("Padrão", "Default")}>Padrão</button>
+          <button class="chip" data-sort="estrelas" {bi("Mais estrelas", "Most stars")}>Mais estrelas</button>
+          <button class="chip" data-sort="recentes" {bi("Atualizados", "Recently updated")}>Atualizados</button>
+          <button class="chip" data-sort="nome" {bi("Nome", "Name")}>Nome</button>
+        </div>
       </div>
     </div>
 
@@ -1611,6 +1735,20 @@ body {
   color: var(--muted-2);
   word-break: break-all;
 }
+
+/* ---- Selo de saude do repositorio de origem ---- */
+.health { display: inline-flex; gap: .3rem; margin-left: .45rem; vertical-align: middle; }
+.hl-stars, .hl-age {
+  padding: .05rem .4rem;
+  border-radius: 99px;
+  font-size: .66rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.hl-stars { background: var(--c-integracoes-bg); color: var(--c-integracoes-fg); }
+.hl-fresh { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
+.hl-ok    { background: var(--c-geral-bg);       color: var(--c-geral-fg); }
+.hl-stale { background: var(--c-seguranca-bg);   color: var(--c-seguranca-fg); }
 
 /* ---- Link do repositorio GitHub ---- */
 .repo-link {
@@ -2174,6 +2312,44 @@ function wireChips(attr, set) {
 }
 
 wireChips('scope', v => { activeScope = v; });
+
+/* ---------------------------------------------------------------------
+   Ordenacao
+   A ordem padrao e a que o gerador emitiu (tipo, depois nome). As outras
+   reordenam os nos no proprio grid — sem re-render, sem perder o estado
+   dos filtros, que continuam sendo aplicados por apply().
+--------------------------------------------------------------------- */
+const grid = document.getElementById('grid');
+const ordemOriginal = [...cards];
+
+function sortBy(modo) {
+  let lista;
+  if (modo === 'estrelas') {
+    lista = [...cards].sort((a, b) =>
+      (+b.dataset.stars || 0) - (+a.dataset.stars || 0) ||
+      a.dataset.name.localeCompare(b.dataset.name));
+  } else if (modo === 'recentes') {
+    // data-age e "dias desde o ultimo push"; -1 significa sem informacao,
+    // e esses vao para o fim em vez de fingir que sao os mais recentes.
+    const idade = el => { const d = +el.dataset.age; return d < 0 ? Infinity : d; };
+    lista = [...cards].sort((a, b) => idade(a) - idade(b));
+  } else if (modo === 'nome') {
+    lista = [...cards].sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+  } else {
+    lista = ordemOriginal;
+  }
+  lista.forEach(c => grid.appendChild(c));
+}
+
+const chipsOrdem = document.querySelectorAll('.chip[data-sort]');
+chipsOrdem.forEach(chip => {
+  chip.addEventListener('click', () => {
+    chipsOrdem.forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    sortBy(chip.dataset.sort);
+  });
+});
+
 wireChips('catf',  v => { activeCat   = v; });
 
 /* ---------------------------------------------------------------------
@@ -2899,6 +3075,18 @@ def main():
     for it in items:
         resolve_repo(it)
     save_cache(CACHE)
+
+    # Saude dos repositorios de origem. Sao poucos repositorios distintos para
+    # muitos recursos, entao o custo e baixo; o cache cobre a geracao offline.
+    global REPO_HEALTH
+    urls = {i["repo"] for i in items if i.get("repo")}
+    if ONLINE:
+        print(f"[*] Consultando saude de {len(urls)} repositorios...")
+        REPO_HEALTH = refresh_repo_health(urls)
+    else:
+        REPO_HEALTH = load_repo_health()
+        if REPO_HEALTH:
+            print(f"[*] Saude dos repositorios: cache de {len(REPO_HEALTH)} (use --online para atualizar)")
 
     # Classificacao por finalidade (badge de categoria)
     for it in items:

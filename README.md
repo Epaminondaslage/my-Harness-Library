@@ -98,6 +98,27 @@ Click any Markdown file under your own `~/.claude` and a modal opens: Markdown e
 
 Plugin and project resources are deliberately **read-only** — editing them would be overwritten by the next plugin update, or would dirty a git tree.
 
+### Tells you which sources are still alive
+
+A typical installation's 248 resources come from about eight repositories, so
+asking GitHub "is this still maintained?" costs eight requests, not 248. Each
+**plugin** card carries its repository's star count and how long since the last
+push — `active`, `4mo`, or a red `idle 14mo`. Archived repositories say so.
+
+The badge sits on plugin cards only, deliberately: 148 of those 248 resources
+point at the same repository, and repeating one number 148 times is noise, not
+information. The numbers still reach every card as data, because sorting uses
+them.
+
+**Sort** by most stars or most recently updated, and combine it with the
+filters. `Source → Available` sorted by stars answers the question the
+catalogue exists for: of the 183 things I could install, which are worth
+looking at first?
+
+Health data is fetched only with `--online` and cached on disk, so the daily
+cron stays offline and the page keeps showing the last known values. A network
+failure never breaks a build — it keeps the cache.
+
 ### Stays current
 
 A daily cron regenerates the page. The `↻` button in the header regenerates on demand.
@@ -291,6 +312,7 @@ Most behaviour is deliberately not configurable — fewer knobs, fewer ways to g
 | Daily regeneration time | crontab of your user | 06:22 |
 | Categories and rules | `CATEGORY_LABEL`, `CATEGORY_MAP`, `CATEGORY_RULES` in `inventory.py` | eight categories |
 | Projects scanned | `PROJECT_ROOTS` in `inventory.py` | `/opt/*/.claude` |
+| Repository health cache | `~/.claude/.inventory/repo-health.json` | refreshed by `--online` |
 | Scanned tree | first CLI argument | `~/.claude` |
 
 To classify a single resource, prefer `category:` in its frontmatter over editing the rules.
@@ -306,7 +328,8 @@ bash /opt/harness-library/setup.sh --check
 # Regenerate now, from the shell
 bash /opt/harness-library/regenerate.sh
 
-# Regenerate and also query npm/GitHub for the few remaining repositories
+# Regenerate, and refresh repository health (stars, last push) plus the few
+# repositories that only npm knows about. Cached afterwards.
 bash /opt/harness-library/regenerate.sh --online
 
 # Generate into the current directory without publishing (works anywhere)
