@@ -90,7 +90,8 @@ step "Environment"
 step "Current installation"
 [[ -f "$UNIT" ]] && ok "systemd unit installed" || warn "systemd unit absent"
 systemctl is-active --quiet harness-library 2>/dev/null && ok "backend running" || warn "backend not running"
-grep -rqs 'my-harness-library/api' /etc/nginx/sites-enabled/ && ok "nginx route configured" || warn "nginx route absent"
+# -R (not -r): sites-enabled is made of symlinks, which -r skips.
+grep -Rqs 'my-harness-library/api' /etc/nginx/sites-enabled/ && ok "nginx route configured" || warn "nginx route absent"
 if [[ -f "$STATE/auth.hash" ]]; then
   if head -c 3 "$STATE/auth.hash" | grep -q '^\$2'; then
     warn "password stored in the old bcrypt format — will be reset below"
@@ -148,7 +149,7 @@ ok "$UNIT"
 step "Removing the previous installation, if present"
 # Upgrade path from the PHP version: drop its nginx location block and its
 # FPM pool. Harmless no-op on a fresh install.
-LEGACY_VHOST="$(grep -rls 'claude-inventory/api' /etc/nginx/sites-enabled/ 2>/dev/null \
+LEGACY_VHOST="$(grep -Rls 'claude-inventory/api' /etc/nginx/sites-enabled/ 2>/dev/null \
                  | xargs -r -n1 readlink -f | sort -u | head -1)"
 if [[ -n "$LEGACY_VHOST" ]]; then
   cp -a "$LEGACY_VHOST" "$LEGACY_VHOST.bak-php-$(date +%Y%m%d-%H%M%S)"
@@ -298,11 +299,27 @@ sudo -u "$TARGET_USER" bash "$DIR/regenerate.sh" || warn "generation failed (che
 
 step "Verification"
 IP="$(hostname -I | awk '{print $1}')"
-CODE="$(curl -sk -o /dev/null -w '%{http_code}' "http://$IP/my-harness-library/")"
-API="$(curl -sk -X POST "http://$IP/my-harness-library/api" \
-        -H 'Content-Type: application/json' -d '{"action":"status"}' -o /dev/null -w '%{http_code}')"
-[[ "$CODE" =~ ^(200|301)$ ]] && ok "page responds ($CODE)" || bad "page responded $CODE"
-[[ "$API" == "200" ]] && ok "backend responds (200)" || bad "backend responded $API"
+# Probe HTTPS first: a vhost that redirects 80 -> 443 answers 301 here, and
+# following it with -L would turn the POST into a GET. Fall back to plain HTTP
+# when there is no TLS listener.
+probe() {   # $1 = path, $2 = "post" for a JSON POST
+  local url code
+  for scheme in https http; do
+    url="$scheme://$IP$1"
+    if [[ "${2:-}" == "post" ]]; then
+      code="$(curl -sk -m 10 -X POST "$url" -H 'Content-Type: application/json' \
+              -d '{"action":"status"}' -o /dev/null -w '%{http_code}' 2>/dev/null)"
+    else
+      code="$(curl -sk -m 10 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null)"
+    fi
+    [[ "$code" == "200" ]] && { echo "$code"; return; }
+  done
+  echo "$code"
+}
+CODE="$(probe /my-harness-library/)"
+API="$(probe /my-harness-library/api post)"
+[[ "$CODE" == "200" ]] && ok "page responds (200)" || bad "page responded $CODE"
+[[ "$API"  == "200" ]] && ok "backend responds (200)" || bad "backend responded $API"
 
 echo
 echo "${GRN}Done.${OFF}  http://$IP/my-harness-library/"
