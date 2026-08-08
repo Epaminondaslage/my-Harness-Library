@@ -117,8 +117,8 @@ English and Portuguese, switched by the flag in the header, no reload. Light and
 
 *The Source row is filtered to **Installed 52**, so every card shown is something
 Claude Code actually loads — the other 183 sit in a marketplace catalogue. The
-host, directory and user of the machine that generated this page are blurred
-here; on your own install they read plainly.*
+provenance card at the top names the host, directory and user the inventory was
+generated from, which is what makes a page shared between machines unambiguous.*
 
 The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
 
