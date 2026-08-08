@@ -69,7 +69,7 @@ category: devops
 
 Four layers, again strongest first: the resource directory's `git remote`; a `repository` field in its manifest or frontmatter; the marketplace's declared origin from `known_marketplaces.json`; and, only with `--online`, the npm registry and GitHub search (results from search are labelled *likely*).
 
-Layer three is what makes this work without a network: it resolves **307 of 310** resources on a typical installation, exactly, because the marketplace registry records the repository each plugin came from.
+Layer three is what makes this work without a network: on a typical installation it resolves **306 of 310** resources exactly, offline, because the marketplace registry records the repository each plugin came from. The four it cannot resolve are the two skills you wrote yourself — which have no repository — and the two MCP servers, whose origin lives in the npm registry. Adding `--online` recovers one of the two MCPs; the other declares no repository upstream.
 
 ### Edits the resources you own
 
