@@ -25,9 +25,36 @@ mkdir -p "$WORK" "$(dirname "$LOCK")" "$STATE"
 
 # --watch: only acts when the page asked for a regeneration. This is what the
 # one-minute cron runs, so it costs almost nothing when there is no request.
+# It also fires on its own when the harness changed since the last run:
+# a plugin installed or removed, a skill/agent/command edited, an MCP added.
+# "Changed" means any watched path is newer than status.json (written at the
+# end of every run, success or failure, so a broken run cannot loop forever).
+WATCHED=(
+  "$HOME/.claude/plugins/installed_plugins.json"
+  "$HOME/.claude/plugins/known_marketplaces.json"
+  "$HOME/.claude/skills"
+  "$HOME/.claude/agents"
+  "$HOME/.claude/commands"
+  "$HOME/.claude.json"
+)
+harness_changed() {
+  [[ -f "$STATUS" ]] || return 0
+  local p
+  for p in "${WATCHED[@]}"; do
+    [[ -e "$p" ]] || continue
+    [[ -n "$(find "$p" -maxdepth 2 -newer "$STATUS" -print -quit 2>/dev/null)" ]] && return 0
+  done
+  return 1
+}
 if [[ "${1:-}" == "--watch" ]]; then
-  [[ -f "$REQUEST" ]] || exit 0
-  rm -f "$REQUEST"
+  if [[ -f "$REQUEST" ]]; then
+    rm -f "$REQUEST"
+  elif harness_changed; then
+    echo "harness changed — regenerating"
+  else
+    exit 0
+  fi
+  shift
 fi
 
 exec 9>"$LOCK"
