@@ -24,7 +24,7 @@ graph TB
         SK[skills/ agents/ commands/]
         PL[plugins/ + installed_plugins.json + known_marketplaces.json]
         CJ[~/.claude.json  MCPs]
-        PR[/opt/*/.claude  project resources/]
+        PR["/opt/*/.claude  project resources"]
     end
     subgraph Cron["cron (user)"]
         D[daily 06:22]
@@ -35,11 +35,11 @@ graph TB
         I[inventory.py]
     end
     subgraph Web["nginx"]
-        S[/var/www/html/my-harness-library\nindex.html styles.css app.js/]
-        P[location = /my-harness-library/api\nproxy_pass unix socket]
+        S["/var/www/html/my-harness-library<br/>index.html styles.css app.js"]
+        P["location = /my-harness-library/api<br/>proxy_pass unix socket"]
     end
     subgraph Backend["systemd: harness-library.service"]
-        A[api.py\nAF_UNIX only, no exec]
+        A["api.py<br/>AF_UNIX only, no exec"]
     end
     subgraph State["~/.claude/.inventory"]
         ST[status.json]
@@ -57,12 +57,12 @@ graph TB
     I --> S
     R --> ST
     S -- "browser JS" --> P --> A
-    A -- read/save/create/restore --> SK
+    A -- "read/save/create/restore" --> SK
     A -- regen --> RQ
-    RQ -. consumed by .-> W
-    SK -. mtime newer than status.json .-> W
-    PL -. mtime .-> W
-    CJ -. mtime .-> W
+    RQ -. "consumed by" .-> W
+    SK -. "mtime newer than status.json" .-> W
+    PL -. "mtime" .-> W
+    CJ -. "mtime" .-> W
     A --> AH
     I --> RH
 ```
