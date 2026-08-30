@@ -25,6 +25,7 @@ On a typical installation the difference is stark: the Claude Code plugin list s
 - [Uninstalling](#uninstalling)
 - [Troubleshooting](#troubleshooting)
 - [Project layout](#project-layout)
+- [Codebase map](#codebase-map)
 - [Notes for contributors](#notes-for-contributors)
 - [License](#license)
 
@@ -440,7 +441,11 @@ Working as intended. Skills and agents need `name` and `description`; without th
 my-Harness-Library/
 ├── install.sh              one-line bootstrap (curl target)
 ├── README.md
+├── CLAUDE.md               summary and working rules for Claude Code sessions
 ├── LICENSE
+├── docs/
+│   ├── CODEBASE_MAP.md              architecture, data flows, gotchas, navigation guide
+│   └── screenshot-{light,dark}.png
 └── src/
     ├── inventory.py                 scanner and static-site generator
     ├── api.py                       read/write backend (the only dynamic endpoint)
@@ -451,6 +456,14 @@ my-Harness-Library/
 ```
 
 Nothing is generated at build time and no dependency is vendored. What you read is what runs.
+
+---
+
+## Codebase map
+
+[docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) is the developer-facing companion to this README: an architecture diagram of how cron, the generator, nginx, the backend and the state directory fit together; a module guide for `inventory.py` (every section with its key functions, and the rules that decide whether a resource is *Mine*, *Installed*, *Available* or *From project*), `api.py` (every action, what needs the password, what is validated) and the shell scripts; sequence diagrams for generation, regeneration (from the button and automatic), and editing a skill from the page; the project's conventions; a list of gotchas already paid for; and a navigation guide — for a given change, which files to touch.
+
+Generated with [Cartographer](https://github.com/kingbootoshi/cartographer) and kept in the repository so it is versioned with the code. `CLAUDE.md` at the root is the short form that Claude Code loads automatically when a session opens in this repository.
 
 ---
 
