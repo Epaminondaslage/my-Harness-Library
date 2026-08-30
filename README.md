@@ -122,7 +122,7 @@ failure never breaks a build — it keeps the cache.
 
 ### Stays current
 
-A daily cron regenerates the page. The `↻` button in the header regenerates on demand.
+The page regenerates on its own when the harness changes: install or remove a plugin, add a marketplace, edit a skill, agent or command, register an MCP server — within a minute the page reflects it. A daily cron regenerates it anyway, and the `↻` button in the header regenerates on demand.
 
 ### Bilingual, themed, keyboard-friendly
 
@@ -271,7 +271,22 @@ Three pieces, deliberately kept apart:
 
 **`api.py`** is the only dynamic part, reached at exactly one URL. It is a small JSON service speaking HTTP over a Unix socket, started by systemd and proxied by nginx at `/my-harness-library/api`. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
 
-**`regenerate.sh`** ties them together: runs the generator, copies the output to the web root, records status. Cron calls it daily; a one-minute watcher calls it when the page requests a regeneration.
+**`regenerate.sh`** ties them together: runs the generator, copies the output to the web root, records status. Cron calls it daily; a one-minute watcher (`--watch`) calls it when the page requests a regeneration or when the harness changed.
+
+### Automatic regeneration
+
+The one-minute watcher compares a short list of paths against the modification time of `~/.claude/.inventory/status.json`, which every run writes at the end (success or failure). If any of these is newer, it regenerates:
+
+| Path | What changes it |
+|---|---|
+| `~/.claude/plugins/installed_plugins.json` | `claude plugin install` / `uninstall` |
+| `~/.claude/plugins/known_marketplaces.json` | `claude plugin marketplace add` |
+| `~/.claude/skills/`, `agents/`, `commands/` | creating or editing a skill, agent or command (by hand or from the page) |
+| `~/.claude.json` | registering an MCP server |
+
+Because `status.json` is rewritten after every run, a failing generation cannot loop: it runs once, records the failure, and waits for the next change. `~/.claude.json` also changes for reasons unrelated to MCPs (Claude Code keeps UI state there), so an occasional extra run is expected; each costs about a second. Remove that line from `WATCHED` in `regenerate.sh` if you would rather not have it.
+
+Resources scanned from projects (`/opt/*/.claude`) are **not** watched; they are picked up by the daily run or the `↻` button.
 
 ### Why the Regenerate button takes up to 60 seconds
 
@@ -312,6 +327,7 @@ Most behaviour is deliberately not configurable — fewer knobs, fewer ways to g
 | Revisions kept per file | `KEEP_REVISIONS` in `api.py` | 10 |
 | Max file size | `MAX_BYTES` in `api.py` | 1 MB |
 | Daily regeneration time | crontab of your user | 06:22 |
+| Paths that trigger automatic regeneration | `WATCHED` in `regenerate.sh` | `installed_plugins.json`, `known_marketplaces.json`, `skills/`, `agents/`, `commands/`, `~/.claude.json` |
 | Categories and rules | `CATEGORY_LABEL`, `CATEGORY_MAP`, `CATEGORY_RULES` in `inventory.py` | eight categories |
 | Projects scanned | `PROJECT_ROOTS` in `inventory.py` | `/opt/*/.claude` |
 | Repository health cache | `~/.claude/.inventory/repo-health.json` | refreshed by `--online` |
@@ -402,10 +418,10 @@ Neither form touches your skills, agents or commands. Without `--purge`, your pa
 The service is down or the nginx route is missing. Run `bash setup.sh --check`, then `systemctl status harness-library` and `journalctl -u harness-library -n 50`.
 
 **The page shows old content**
-It is a static file. Click ↻ and wait up to 60 seconds, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron: `crontab -l`.
+It is a static file, refreshed by the one-minute watcher when the harness changes. Wait a minute, click ↻, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron (`crontab -l`) and its log (`~/logs/harness-library.log`): a run triggered by a change prints `harness changed — regenerating`.
 
 **A plugin you installed shows as `Available`**
-The scan trusts `~/.claude/plugins/installed_plugins.json`. If a plugin is installed but its entry is missing or points at a path that no longer exists, its resources fall back to the catalogue. Regenerate after Claude Code finishes installing.
+The scan trusts `~/.claude/plugins/installed_plugins.json`. If a plugin is installed but its entry is missing or points at a path that no longer exists, its resources fall back to the catalogue. The watcher regenerates within a minute of Claude Code finishing the installation; if the page still says `Available`, check `installed_plugins.json` by hand.
 
 **Nothing is editable**
 Only files under your own `~/.claude/skills|agents|commands` are. Plugin, catalogue and project resources are read-only by design — filter by **Source → Mine** to see what you can edit.
