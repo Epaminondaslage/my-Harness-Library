@@ -1,4 +1,4 @@
-# Catálogo de Agent Skills
+# Catálogo de Agent Skills. 31-08-2026
 
 | # | Skill | Repositório GitHub | ⭐ Stars | 📦 Instalações | Função principal | Nota Dev |
 |---:|---|---|---:|---:|---|:---:|
