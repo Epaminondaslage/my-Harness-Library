@@ -17,6 +17,23 @@
 | 13 | `video-use` | `browser-use/video-use` | ⭐ ~2K | Baixa | Edição de vídeo controlada por agente | 5/10 |
 | 14 | `pricing` | `coreyhaines31/marketingskills` | ⭐ 46K+ | 55,2K | Estratégia de preços e monetização | 6/10 |
 | 15 | `find-skills` | `vercel-labs/skills` | ⭐ 30,0K | 3,2M | Descoberta e instalação de novas Agent Skills | 10/10 |
+| 16 | `superpowers` | `obra/superpowers` | ⭐ 280,1K | N/D | Framework de skills agentic e metodologia de dev (brainstorm, TDD, debug sistemático) | 9/10 |
+| 17 | `playwright` | `microsoft/playwright` | ⭐ 95,4K | N/D | Automação e teste web (Chromium/Firefox/WebKit) | 9/10 |
+| 18 | `agents` | `wshobson/agents` | ⭐ 39,3K | N/D | Marketplace multi-harness de subagentes (Claude Code, Codex, Cursor, etc.) | 8/10 |
+| 19 | `humanlayer` | `humanlayer/humanlayer` | ⭐ 11,4K | N/D | Fazer agentes resolverem problemas complexos em codebases grandes | 8/10 |
+| 20 | `fabric` | `danielmiessler/fabric` | ⭐ 43,7K | N/D | Framework de prompts modulares crowdsourced p/ resolver problemas com IA | 7/10 |
+| 21 | `awesome-claude-skills` | `ComposioHQ/awesome-claude-skills` | ⭐ 74,2K | N/D | Lista curada de Claude Skills e recursos | 7/10 |
+| 22 | `claude-code-hooks-mastery` | `disler/claude-code-hooks-mastery` | ⭐ 3,9K | N/D | Domínio de hooks (lifecycle events) do Claude Code | 7/10 |
+| 23 | `llm` | `simonw/llm` | ⭐ 12,4K | N/D | Acesso e orquestração de LLMs via linha de comando | 7/10 |
+| 24 | `magic-mcp` | `21st-dev/magic-mcp` | ⭐ 5,8K | N/D | Geração de componentes UI React/Tailwind via IA | 7/10 |
+| 25 | `awesome-ai-agents` | `e2b-dev/awesome-ai-agents` | ⭐ 29,8K | N/D | Lista curada de agentes autônomos de IA | 6/10 |
+| 26 | `awesome-claude-skills` | `travisvn/awesome-claude-skills` | ⭐ 14,9K | N/D | Lista curada de skills e recursos p/ workflows Claude | 6/10 |
+| 27 | `awesome-claude-skills` | `BehiSecc/awesome-claude-skills` | ⭐ 10,1K | N/D | Lista curada de Claude Skills | 6/10 |
+| 28 | `my-claude-code-setup` | `centminmod/my-claude-code-setup` | ⭐ 2,6K | N/D | Template CLAUDE.md e config inicial p/ Claude Code | 6/10 |
+| 29 | `claude-code-mcp` | `steipete/claude-code-mcp` | ⭐ 1,3K | N/D | Claude Code como servidor MCP one-shot dentro de outro agente | 6/10 |
+| 30 | `easier-life-skills` | `dan323/easier-life-skills` | ⭐ 7 | N/D | Skill p/ recomendar outras skills relevantes ao projeto ativo | 6/10 |
+
+> Linhas 16-30: ⭐ Stars verificadas via GitHub API em 31-08-2026. 📦 Instalações marcadas `N/D` — não existe métrica pública de instalação para repositórios de skill no GitHub; os valores nas linhas 1-15 foram mantidos como estavam.
 
 ## Ranking recomendado para desenvolvimento
 
@@ -37,3 +54,10 @@
 | 13 | `video-lens` | 6/10 | Pesquisa e análise de vídeos |
 | 14 | `canvas-design` | 6/10 | Design gráfico |
 | 15 | `video-use` | 5/10 | Produção e edição audiovisual |
+| 16 | `superpowers` | 9/10 | Metodologia agentic (brainstorm, TDD, debug) |
+| 17 | `playwright` | 9/10 | Automação e teste web |
+| 18 | `agents` | 8/10 | Marketplace multi-harness de subagentes |
+| 19 | `humanlayer` | 8/10 | Agentes em codebases complexos |
+| 20 | `fabric` | 7/10 | Prompts modulares crowdsourced |
+| 21-27 | `awesome-claude-skills` (Composio/travisvn/BehiSecc), `claude-code-hooks-mastery`, `llm`, `magic-mcp`, `awesome-ai-agents` | 6-7/10 | Listas curadas, hooks, LLM CLI, geração de UI |
+| 28-30 | `my-claude-code-setup`, `claude-code-mcp`, `easier-life-skills` | 6/10 | Setup/config, MCP one-shot, recomendação de skills |
