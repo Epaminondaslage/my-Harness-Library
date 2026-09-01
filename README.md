@@ -1,12 +1,12 @@
 # My Harness Library
 
-**A self-hosted, searchable inventory of everything your Claude Code installation can actually do — with an in-browser Markdown editor for the resources you own.**
+**A self-hosted, searchable inventory of everything your Claude Code installation can actually do, with an in-browser Markdown editor for the resources you own.**
 
 Claude Code accumulates capability fast. You install a plugin and get thirty skills you never see listed. You write a skill for one project and forget it exists. `~/.claude` becomes a place you *have*, not a place you *know*.
 
-My Harness Library scans that tree — plus every installed plugin and every project-local `.claude/` — and publishes a single static page: every skill, agent, command, plugin and MCP server, each classified by purpose, each linked to the GitHub repository it came from, all searchable in one box.
+My Harness Library scans that tree, plus every installed plugin and every project-local `.claude/`, and publishes a single static page: every skill, agent, command, plugin and MCP server, each classified by purpose, each linked to the GitHub repository it came from, all searchable in one box.
 
-On a typical installation the difference is stark: the Claude Code plugin list shows **58 plugins**; My Harness Library shows the **248 individual resources** inside them — and tells you which **52** are actually installed and loadable, versus the **183** that merely sit in a marketplace catalogue waiting to be installed.
+On a typical installation the difference is stark: the Claude Code plugin list shows **58 plugins**; My Harness Library shows the **248 individual resources** inside them, and tells you which **52** are actually installed and loadable, versus the **183** that merely sit in a marketplace catalogue waiting to be installed.
 
 ---
 
@@ -49,14 +49,14 @@ Five sources are scanned:
 
 `~/.claude/plugins` holds two very different things in one tree: `marketplaces/`
 is a *catalogue* of everything you could install, while `cache/` holds the copies
-that actually are — one directory per version ever downloaded.
+that actually are: one directory per version ever downloaded.
 
 Walking that tree naively conflates the two and counts the same skill several
 times: once from the catalogue, once per cached version. `installed_plugins.json`
 records exactly which path is active, so that is what decides.
 
-Every resource is therefore tagged by origin — **Mine**, **Installed**,
-**Available**, **From project** — and the installed copy always wins when the
+Every resource is therefore tagged by origin: **Mine**, **Installed**,
+**Available**, **From project**. The installed copy always wins when the
 same resource appears in both places. Catalogue entries are dimmed, because they
 are not loaded by anything yet.
 
@@ -69,12 +69,12 @@ Every resource gets a category badge: **General**, **DevOps**, **Spec-Driven Ops
 
 Classification is deterministic and layered, strongest first:
 
-1. a `category:` field in the resource's own frontmatter — your explicit decision, always wins
+1. a `category:` field in the resource's own frontmatter (your explicit decision, always wins)
 2. an exact-name map covering the common marketplace catalogue
 3. keyword rules over name and description, so new resources classify themselves
 4. `Other`, when nothing matches
 
-No LLM call, no network, no cost. To correct a classification, write one line in the file — from the built-in editor, if you like:
+No LLM call, no network, no cost. To correct a classification, write one line in the file, from the built-in editor if you like:
 
 ```yaml
 ---
@@ -83,29 +83,29 @@ category: devops
 ---
 ```
 
-### Finds the source repository — offline
+### Finds the source repository, offline
 
 Four layers, again strongest first: the resource directory's `git remote`; a `repository` field in its manifest or frontmatter; the marketplace's declared origin from `known_marketplaces.json`; and, only with `--online`, the npm registry and GitHub search (results from search are labelled *likely*).
 
-Layer three is what makes this work without a network: on a typical installation it resolves **244 of 248** resources exactly, offline, because the marketplace registry records the repository each plugin came from. The four it cannot resolve are the two skills you wrote yourself — which have no repository — and the two MCP servers, whose origin lives in the npm registry. Adding `--online` recovers one of the two MCPs; the other declares no repository upstream.
+Layer three is what makes this work without a network: on a typical installation it resolves **244 of 248** resources exactly, offline, because the marketplace registry records the repository each plugin came from. The four it cannot resolve are the two skills you wrote yourself (which have no repository) and the two MCP servers, whose origin lives in the npm registry. Adding `--online` recovers one of the two MCPs; the other declares no repository upstream.
 
 ### Edits the resources you own
 
 Click any Markdown file under your own `~/.claude` and a modal opens: Markdown editor on the left, live preview on the right, a formatting toolbar, `Ctrl+B`/`Ctrl+I`/`Ctrl+S`.
 
-- **YAML frontmatter is preserved byte for byte** — it is displayed as a separate block and never reformatted, because that block is what Claude Code actually reads.
-- **Frontmatter is validated on save.** A skill or agent missing `name` or `description` is rejected with an explanation. Claude Code fails *silently* on those — the resource simply never loads, and you find out much later.
+- **YAML frontmatter is preserved byte for byte**: it is displayed as a separate block and never reformatted, because that block is what Claude Code actually reads.
+- **Frontmatter is validated on save.** A skill or agent missing `name` or `description` is rejected with an explanation. Claude Code fails *silently* on those: the resource simply never loads, and you find out much later.
 - **Every save keeps a dated revision** (last 10 per file), listed in the modal with a line-by-line diff against your current text, and one-click restore.
 - **Concurrent edits are detected**: if the file changed on disk since you opened it, the save is refused rather than clobbering.
 
-Plugin and project resources are deliberately **read-only** — editing them would be overwritten by the next plugin update, or would dirty a git tree.
+Plugin and project resources are deliberately **read-only**: editing them would be overwritten by the next plugin update, or would dirty a git tree.
 
 ### Tells you which sources are still alive
 
 A typical installation's 248 resources come from about eight repositories, so
 asking GitHub "is this still maintained?" costs eight requests, not 248. Each
 **plugin** card carries its repository's star count and how long since the last
-push — `active`, `4mo`, or a red `idle 14mo`. Archived repositories say so.
+push: `active`, `4mo`, or a red `idle 14mo`. Archived repositories say so.
 
 The badge sits on plugin cards only, deliberately: 148 of those 248 resources
 point at the same repository, and repeating one number 148 times is noise, not
@@ -119,11 +119,11 @@ looking at first?
 
 Health data is fetched only with `--online` and cached on disk, so the daily
 cron stays offline and the page keeps showing the last known values. A network
-failure never breaks a build — it keeps the cache.
+failure never breaks a build; it keeps the cache.
 
 ### Stays current
 
-The page regenerates on its own when the harness changes: install or remove a plugin, add a marketplace, edit a skill, agent or command, register an MCP server — within a minute the page reflects it. A daily cron regenerates it anyway, and the `↻` button in the header regenerates on demand.
+The page regenerates on its own when the harness changes: install or remove a plugin, add a marketplace, edit a skill, agent or command, register an MCP server: within a minute the page reflects it. A daily cron regenerates it anyway, and the `↻` button in the header regenerates on demand.
 
 ### Bilingual, themed, keyboard-friendly
 
@@ -144,9 +144,9 @@ repository's health. The other 183 sit in a marketplace catalogue.*
 
 The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
 
-Below it, a provenance card shows which host, which directory, which user and which version this inventory came from — so a page shared between machines is never ambiguous, and you can tell at a glance whether it was built by an old install.
+Below it, a provenance card shows which host, which directory, which user and which version this inventory came from, so a page shared between machines is never ambiguous, and you can tell at a glance whether it was built by an old install.
 
-Then: a search box, type tabs (`All 248 · Skills 108 · Agents 43 · Commands 37 · Plugins 58 · MCPs 2`), and two rows of filter chips — **Source** (`Mine 4 · Installed 52 · Available 183 · From project 9`) and **Purpose**. Filters combine with each other and with the search.
+Then: a search box, type tabs (`All 248 · Skills 108 · Agents 43 · Commands 37 · Plugins 58 · MCPs 2`), and two rows of filter chips: **Source** (`Mine 4 · Installed 52 · Available 183 · From project 9`) and **Purpose**. Filters combine with each other and with the search.
 
 ---
 
@@ -217,7 +217,7 @@ sudo bash src/setup.sh         # install
 
 ## First run: the initial password
 
-Writing to `~/.claude` is password-protected. Reading is not — the page is browsable by anyone who can reach it.
+Writing to `~/.claude` is password-protected. Reading is not: the page is browsable by anyone who can reach it.
 
 **How the password gets set depends on how you installed:**
 
@@ -241,11 +241,11 @@ That is the literal initial password. It is deliberately weak and deliberately m
 4. new password, twice, minimum 8 characters
 5. click **Change**
 
-It takes effect on the very next request — no restart, no reload, no service to bounce. The old password stops working immediately, and the change is recorded in the audit log.
+It takes effect on the very next request: no restart, no reload, no service to bounce. The old password stops working immediately, and the change is recorded in the audit log.
 
-Only an **scrypt hash** is ever written to disk, at `~/.claude/.inventory/auth.hash`, mode `600` — parameters `N=16384, r=8, p=1`, a 16-byte random salt, compared in constant time. The plaintext is never stored, never logged, and never leaves the request.
+Only an **scrypt hash** is ever written to disk, at `~/.claude/.inventory/auth.hash`, mode `600` (parameters `N=16384, r=8, p=1`, a 16-byte random salt, compared in constant time). The plaintext is never stored, never logged, and never leaves the request.
 
-There is no password recovery, by design. If you lose it, you have shell access to the machine — rewrite the hash:
+There is no password recovery, by design. If you lose it, you have shell access to the machine, so rewrite the hash:
 
 ```bash
 python3 - 'new-password' <<'EOS'
@@ -268,7 +268,7 @@ EOS
 
 Three pieces, deliberately kept apart:
 
-**`inventory.py`** walks the filesystem and writes three static files — `index.html`, `styles.css`, `app.js`. It talks to nothing, needs no network, and imports only the standard library. Run it by hand anywhere; it drops a `claude_inventory_site/` next to you.
+**`inventory.py`** walks the filesystem and writes three static files: `index.html`, `styles.css`, `app.js`. It talks to nothing, needs no network, and imports only the standard library. Run it by hand anywhere; it drops a `claude_inventory_site/` next to you.
 
 **`api.py`** is the only dynamic part, reached at exactly one URL. It is a small JSON service speaking HTTP over a Unix socket, started by systemd and proxied by nginx at `/my-harness-library/api`. It reads and writes Markdown files under `~/.claude`, checks the password, validates frontmatter, keeps revisions and appends to the audit log.
 
@@ -301,13 +301,13 @@ Regeneration therefore does not run in the backend. The button writes a request 
 
 This tool writes to a directory whose contents Claude Code later executes. It is built accordingly.
 
-**The web server user gets nothing.** A typical `$HOME` is `750` and `~/.claude` is `700` — `www-data` cannot even traverse them, and this tool does not change that. Instead, the backend runs as *you*, under systemd, and nginx reaches it only through a Unix socket. No `chmod`, no `setfacl`. Zero permission changes anywhere on the filesystem.
+**The web server user gets nothing.** A typical `$HOME` is `750` and `~/.claude` is `700`, so `www-data` cannot even traverse them, and this tool does not change that. Instead, the backend runs as *you*, under systemd, and nginx reaches it only through a Unix socket. No `chmod`, no `setfacl`. Zero permission changes anywhere on the filesystem.
 
-**The service is fenced by the kernel, not by the interpreter.** The systemd unit sets `ProtectSystem=strict` and `ProtectHome=read-only`, then opens exactly one writable path: `~/.claude`. It adds `NoNewPrivileges`, an empty capability bounding set, `PrivateTmp`, `PrivateDevices`, `MemoryDenyWriteExecute`, `RestrictNamespaces`, `ProtectProc=invisible`, a `@system-service` syscall filter and `RestrictAddressFamilies=AF_UNIX` — the process cannot open a network socket at all. Memory is capped at 128 MB and tasks at 16.
+**The service is fenced by the kernel, not by the interpreter.** The systemd unit sets `ProtectSystem=strict` and `ProtectHome=read-only`, then opens exactly one writable path: `~/.claude`. It adds `NoNewPrivileges`, an empty capability bounding set, `PrivateTmp`, `PrivateDevices`, `MemoryDenyWriteExecute`, `RestrictNamespaces`, `ProtectProc=invisible`, a `@system-service` syscall filter and `RestrictAddressFamilies=AF_UNIX`, so the process cannot open a network socket at all. Memory is capped at 128 MB and tasks at 16.
 
 This is strictly stronger than the `open_basedir` it replaced: an interpreter setting can be sidestepped by native code; a mount namespace and a seccomp filter cannot.
 
-**Paths are checked twice.** A request names a file relative to `~/.claude`. The path must start with `skills/`, `agents/` or `commands/`, must end in `.md`, and must contain no `..`. It is then resolved with `realpath()` and re-checked against the allowed root — which catches a symlink pointing outside.
+**Paths are checked twice.** A request names a file relative to `~/.claude`. The path must start with `skills/`, `agents/` or `commands/`, must end in `.md`, and must contain no `..`. It is then resolved with `realpath()` and re-checked against the allowed root, which catches a symlink pointing outside.
 
 **Writes are atomic and reversible.** Content goes to a temporary file in the same directory and is renamed into place, so a failure never leaves a half-written skill. The previous content is copied to a dated revision first, pruned to the last 10.
 
@@ -321,7 +321,7 @@ This is strictly stronger than the `open_basedir` it replaced: an interpreter se
 
 ## Configuration
 
-Most behaviour is deliberately not configurable — fewer knobs, fewer ways to get it wrong. What you can change:
+Most behaviour is deliberately not configurable: fewer knobs, fewer ways to get it wrong. What you can change:
 
 | What | Where | Default |
 |---|---|---|
@@ -381,13 +381,13 @@ curl -fsSL https://raw.githubusercontent.com/Epaminondaslage/my-Harness-Library/
 
 The installed version is shown on the provenance card and by
 `bash setup.sh --check`. When a newer one is published, a banner appears at the
-top of the page with the command to run — the check happens under `--online`
+top of the page with the command to run. The check happens under `--online`
 and is cached, so the offline daily regeneration keeps showing the last known
 answer.
 
 **There is no automatic update, by design.** Making a machine fetch and execute
-code from GitHub as root on a schedule means whoever controls this repository —
-or anyone who steals a token with write access to it — controls every install,
+code from GitHub as root on a schedule means whoever controls this repository,
+or anyone who steals a token with write access to it, controls every install,
 silently. That is a poor trade for skipping one command, and it is worse here
 than in most tools, because this one writes into a directory your agent later
 executes.
@@ -425,13 +425,13 @@ It is a static file, refreshed by the one-minute watcher when the harness change
 The scan trusts `~/.claude/plugins/installed_plugins.json`. If a plugin is installed but its entry is missing or points at a path that no longer exists, its resources fall back to the catalogue. The watcher regenerates within a minute of Claude Code finishing the installation; if the page still says `Available`, check `installed_plugins.json` by hand.
 
 **Nothing is editable**
-Only files under your own `~/.claude/skills|agents|commands` are. Plugin, catalogue and project resources are read-only by design — filter by **Source → Mine** to see what you can edit.
+Only files under your own `~/.claude/skills|agents|commands` are. Plugin, catalogue and project resources are read-only by design; filter by **Source → Mine** to see what you can edit.
 
 **`Incomplete frontmatter` when saving**
 Working as intended. Skills and agents need `name` and `description`; without them Claude Code silently refuses to load the resource.
 
 **Backend returns HTTP 500 or 502**
-502 means nginx cannot reach the socket — check that the service is running and that `/run/harness-library/sock` exists. 500 is usually the sandbox: the unit grants write access to `~/.claude` and nothing else, so anything the backend touches must live inside it.
+502 means nginx cannot reach the socket: check that the service is running and that `/run/harness-library/sock` exists. 500 is usually the sandbox: the unit grants write access to `~/.claude` and nothing else, so anything the backend touches must live inside it.
 
 ---
 
@@ -461,7 +461,7 @@ Nothing is generated at build time and no dependency is vendored. What you read 
 
 ## Codebase map
 
-[docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) is the developer-facing companion to this README: an architecture diagram of how cron, the generator, nginx, the backend and the state directory fit together; a module guide for `inventory.py` (every section with its key functions, and the rules that decide whether a resource is *Mine*, *Installed*, *Available* or *From project*), `api.py` (every action, what needs the password, what is validated) and the shell scripts; sequence diagrams for generation, regeneration (from the button and automatic), and editing a skill from the page; the project's conventions; a list of gotchas already paid for; and a navigation guide — for a given change, which files to touch.
+[docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) is the developer-facing companion to this README: an architecture diagram of how cron, the generator, nginx, the backend and the state directory fit together; a module guide for `inventory.py` (every section with its key functions, and the rules that decide whether a resource is *Mine*, *Installed*, *Available* or *From project*), `api.py` (every action, what needs the password, what is validated) and the shell scripts; sequence diagrams for generation, regeneration (from the button and automatic), and editing a skill from the page; the project's conventions; a list of gotchas already paid for; and a navigation guide: for a given change, which files to touch.
 
 Generated with [Cartographer](https://github.com/kingbootoshi/cartographer) and kept in the repository so it is versioned with the code. `CLAUDE.md` at the root is the short form that Claude Code loads automatically when a session opens in this repository.
 
@@ -469,7 +469,7 @@ Generated with [Cartographer](https://github.com/kingbootoshi/cartographer) and 
 
 ## Notes for contributors
 
-The generated page carries both languages in `data-pt` / `data-en` attributes and swaps `textContent` on the client. There is no translation catalogue to keep in sync and no `/en` route — a string and its translation are written on the same line of the generator, so they cannot drift apart. Backend errors carry a stable `code`, which the front end translates, falling back to the server's own text for anything it does not recognise.
+The generated page carries both languages in `data-pt` / `data-en` attributes and swaps `textContent` on the client. There is no translation catalogue to keep in sync and no `/en` route: a string and its translation are written on the same line of the generator, so they cannot drift apart. Backend errors carry a stable `code`, which the front end translates, falling back to the server's own text for anything it does not recognise.
 
 Inline code comments are in Portuguese; the README, the UI and all installer output are bilingual or English. Pull requests are welcome in either language.
 
