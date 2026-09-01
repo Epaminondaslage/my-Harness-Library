@@ -37,11 +37,3 @@
 | 13 | `video-lens` | 6/10 | Pesquisa e análise de vídeos |
 | 14 | `canvas-design` | 6/10 | Design gráfico |
 | 15 | `video-use` | 5/10 | Produção e edição audiovisual |
-
-## Comandos de instalação
-
-### Grill Me
-
-```bash
-npx skills add https://github.com/mattpocock/skills \
-  --skill grill-me
