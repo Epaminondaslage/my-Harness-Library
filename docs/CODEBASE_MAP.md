@@ -83,7 +83,7 @@ my-Harness-Library/
 │   └── harness-library.service.in  systemd unit template (@USER@ @HOME@ @PREFIX@)
 ├── docs/
 │   ├── CODEBASE_MAP.md             this file
-│   └── screenshot-{light,dark}.png
+│   └── screenshot-{light,dark,sepia}.png
 └── .github/workflows/ci.yml        lint + backend smoke test + generator run + secret scan
 ```
 

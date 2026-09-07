@@ -123,11 +123,11 @@ failure never breaks a build; it keeps the cache.
 
 ### Stays current
 
-The page regenerates on its own when the harness changes: install or remove a plugin, add a marketplace, edit a skill, agent or command, register an MCP server: within a minute the page reflects it. A daily cron regenerates it anyway, and the `↻` button in the header regenerates on demand.
+The page regenerates on its own when the harness changes: install or remove a plugin, add a marketplace, edit a skill, agent or command, register an MCP server: within a minute the page reflects it. A daily cron regenerates it anyway, and the **Regenerate** button in the header regenerates on demand.
 
 ### Bilingual, themed, keyboard-friendly
 
-English and Portuguese, switched by the flag in the header, no reload. Light and dark themes following your OS by default. Both choices persist in `localStorage`, independently.
+English and Portuguese, switched by the **PT | EN** button in the header, no reload. Three themes: light, dark and sepia. The theme button cycles through them; without a choice the page follows your OS. Both choices persist in `localStorage`, independently. Press `/` to jump to the search box.
 
 ---
 
@@ -135,14 +135,21 @@ English and Portuguese, switched by the flag in the header, no reload. Light and
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img alt="My Harness Library: 248 resources, filtered by Installed, with type tabs, source and purpose filters, and resource cards" src="docs/screenshot-light.png">
+  <img alt="My Harness Library: 254 resources, filtered by Installed and sorted by most stars, with a sidebar of type, source and purpose filters, and resource cards" src="docs/screenshot-light.png">
 </picture>
 
-*Filtered to **Installed 52** and sorted by **Most stars**: every card shown is
+*Filtered to **Installed 59** and sorted by **Most stars**: every card shown is
 something Claude Code actually loads, and the plugin card carries its
-repository's health. The other 183 sit in a marketplace catalogue.*
+repository's health. The other 195 sit in a marketplace catalogue.*
 
-The header carries, left to right: the title, the resource count and generation time, then 🇺🇸/🇧🇷 (language), 🔑 (change password), ↻ (regenerate), ＋ New, and the theme toggle.
+The sidebar holds the three filters (type, source, purpose), each with a count and the colour the cards use; the machine, directory and version sit at its foot. Above the cards, a result bar shows how many match, one pill per active filter (click to drop it), **Clear filters**, and the sort order. Each card's left border is coloured by type; **Edit** and **GitHub** are buttons on its foot.
+
+The header carries, left to right: the title, the resource count and generation time, then **Regenerate**, **Password**, **PT | EN**, the theme button (light → dark → sepia) and **New resource**.
+
+<details>
+<summary>Sepia theme</summary>
+<img alt="The same page in the sepia theme" src="docs/screenshot-sepia.png">
+</details>
 
 Below it, a provenance card shows which host, which directory, which user and which version this inventory came from, so a page shared between machines is never ambiguous, and you can tell at a glance whether it was built by an old install.
 
@@ -236,7 +243,7 @@ That is the literal initial password. It is deliberately weak and deliberately m
 **Change it before doing anything else:**
 
 1. open the page
-2. click 🔑 in the header
+2. click **Password** in the header
 3. current password: `change-me-now`
 4. new password, twice, minimum 8 characters
 5. click **Change**
@@ -287,7 +294,7 @@ The one-minute watcher compares a short list of paths against the modification t
 
 Because `status.json` is rewritten after every run, a failing generation cannot loop: it runs once, records the failure, and waits for the next change. `~/.claude.json` also changes for reasons unrelated to MCPs (Claude Code keeps UI state there), so an occasional extra run is expected; each costs about a second. Remove that line from `WATCHED` in `regenerate.sh` if you would rather not have it.
 
-Resources scanned from projects (`/opt/*/.claude`) are **not** watched; they are picked up by the daily run or the `↻` button.
+Resources scanned from projects (`/opt/*/.claude`) are **not** watched; they are picked up by the daily run or the **Regenerate** button.
 
 ### Why the Regenerate button takes up to 60 seconds
 
@@ -419,7 +426,7 @@ Neither form touches your skills, agents or commands. Without `--purge`, your pa
 The service is down or the nginx route is missing. Run `bash setup.sh --check`, then `systemctl status harness-library` and `journalctl -u harness-library -n 50`.
 
 **The page shows old content**
-It is a static file, refreshed by the one-minute watcher when the harness changes. Wait a minute, click ↻, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron (`crontab -l`) and its log (`~/logs/harness-library.log`): a run triggered by a change prints `harness changed — regenerating`.
+It is a static file, refreshed by the one-minute watcher when the harness changes. Wait a minute, click **Regenerate**, or run `regenerate.sh` directly. If nothing changes, check the one-minute cron (`crontab -l`) and its log (`~/logs/harness-library.log`): a run triggered by a change prints `harness changed — regenerating`.
 
 **A plugin you installed shows as `Available`**
 The scan trusts `~/.claude/plugins/installed_plugins.json`. If a plugin is installed but its entry is missing or points at a path that no longer exists, its resources fall back to the catalogue. The watcher regenerates within a minute of Claude Code finishing the installation; if the page still says `Available`, check `installed_plugins.json` by hand.
@@ -445,7 +452,7 @@ my-Harness-Library/
 ├── LICENSE
 ├── docs/
 │   ├── CODEBASE_MAP.md              architecture, data flows, gotchas, navigation guide
-│   └── screenshot-{light,dark}.png
+│   └── screenshot-{light,dark,sepia}.png
 └── src/
     ├── inventory.py                 scanner and static-site generator
     ├── api.py                       read/write backend (the only dynamic endpoint)

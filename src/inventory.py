@@ -1133,6 +1133,9 @@ def build_site(items: list) -> None:
     counts = {t: sum(1 for i in items if i["type"] == t) for t in TYPE_LABEL}
     with_repo = sum(1 for i in items if i.get("repo"))
     generated = datetime.now().strftime("%d/%m/%Y %H:%M")
+    # Marca de cache dos assets: muda a cada geracao, entao o navegador nunca
+    # combina um index.html novo com styles/app.js velhos (ou o contrario).
+    asset_v = datetime.now().strftime("%Y%m%d%H%M%S")
 
     # Procedencia do inventario: onde rodou, o que varreu e de quem e o ambiente
     versao   = local_version()
@@ -1296,7 +1299,7 @@ def build_site(items: list) -> None:
       }} catch (e) {{}}   /* localStorage bloqueado: cai no prefers-color-scheme */
     }})();
   </script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v={asset_v}">
 </head>
 <body>
   <header class="topbar">
@@ -1565,7 +1568,7 @@ def build_site(items: list) -> None:
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v={asset_v}"></script>
 </body>
 </html>
 """
@@ -2399,7 +2402,8 @@ function apply() {
     if (show) visible++;
   });
   empty.hidden = visible > 0;
-  document.getElementById('count').textContent = visible;
+  const countEl = document.getElementById('count');
+  if (countEl) countEl.textContent = visible;
   renderActiveFilters();
 }
 
@@ -2419,6 +2423,7 @@ const GROUPS = [
 ];
 
 function renderActiveFilters() {
+  if (!activeBox || !clearBtn) return;
   activeBox.innerHTML = '';
   let n = 0;
   GROUPS.forEach(g => {
@@ -2439,7 +2444,7 @@ function renderActiveFilters() {
   clearBtn.hidden = n === 0 && !search.value;
 }
 
-clearBtn.addEventListener('click', () => {
+if (clearBtn) clearBtn.addEventListener('click', () => {
   search.value = '';
   GROUPS.forEach(g => {
     const all = document.querySelector(g.sel + '[data-' + g.attr + '="all"]');
@@ -2594,8 +2599,9 @@ function applyLang() {
   });
   document.documentElement.lang = LANG === 'en' ? 'en' : 'pt-BR';
   // "PT | EN": o idioma atual em negrito, o outro apagado.
-  document.getElementById('lang-cur').textContent = LANG === 'en' ? 'EN' : 'PT';
-  document.getElementById('lang-alt').textContent = LANG === 'en' ? 'PT' : 'EN';
+  const cur = document.getElementById('lang-cur'), alt = document.getElementById('lang-alt');
+  if (cur) cur.textContent = LANG === 'en' ? 'EN' : 'PT';
+  if (alt) alt.textContent = LANG === 'en' ? 'PT' : 'EN';
   renderActiveFilters();   // os pills usam o rotulo traduzido
 }
 
@@ -2667,7 +2673,8 @@ function sortBy(modo) {
   lista.forEach(c => grid.appendChild(c));
 }
 
-document.getElementById('sort').addEventListener('change', ev => sortBy(ev.target.value));
+const sortSel = document.getElementById('sort');
+if (sortSel) sortSel.addEventListener('change', ev => sortBy(ev.target.value));
 
 wireChips('catf',  v => { activeCat   = v; });
 
