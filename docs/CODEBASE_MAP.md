@@ -117,7 +117,7 @@ Runtime layout on the server (not in the repo):
 | Update check (991–1057) | `VERSION_URL`, `local_version`, `semver`, `check_update` → `update.json` | online only; never blocks generation |
 | Host identity (1058–1100) | `host_ip` (UDP-connect trick, avoids Docker bridge IPs), `host_user` | provenance block on the page |
 | i18n (1101–1128) | `bi`, `bit` | emits `data-pt`/`data-en` attribute pairs; client JS swaps |
-| `build_site` (1129–3170) | index.html, styles.css, **app.js as a raw Python string** | cards, chips, editor modal, history/diff, new-resource dialog, regenerate dialog (polls `status` every 5 s for 2 min), password dialog, update banner |
+| `build_site` (1129–3170) | index.html, styles.css, **app.js as a raw Python string** | sidebar filters (type/source/purpose), result bar (count, active-filter pills, sort select), cards, editor modal, history/diff, new-resource dialog, regenerate dialog (polls `status` every 5 s for 2 min), password dialog, update banner |
 
 **Scope rules** (how a resource is labelled):
 
@@ -173,7 +173,7 @@ Removes cron lines (targeted `grep -v`, not a wipe), unit, nginx block (awk stat
 
 ### `src/harness-library.service.in`
 
-`User=@USER@ Group=www-data UMask=0077`, `RuntimeDirectory=harness-library`, `ProtectSystem=strict`, `ProtectHome=read-only`, **`ReadWritePaths=@HOME@/.claude` (the only writable hole)**, `NoNewPrivileges`, empty capability sets, `RestrictAddressFamilies=AF_UNIX`, `SystemCallFilter=@system-service` minus `@privileged @resources @obsolete @mount @debug @swap` (denies process spawning), `MemoryDenyWriteExecute`, `MemoryMax=128M`, `TasksMax=16`.
+`User=@USER@ Group=www-data UMask=0077`, `RuntimeDirectory=harness-library` + `RuntimeDirectoryPreserve=yes` (a containerised reverse proxy bind-mounts the socket dir; recreating it on restart left the proxy with a stale inode and 502s), `ProtectSystem=strict`, `ProtectHome=read-only`, **`ReadWritePaths=@HOME@/.claude` (the only writable hole)**, `NoNewPrivileges`, empty capability sets, `RestrictAddressFamilies=AF_UNIX`, `SystemCallFilter=@system-service` minus `@privileged @resources @obsolete @mount @debug @swap` (denies process spawning), `MemoryDenyWriteExecute`, `MemoryMax=128M`, `TasksMax=16`.
 
 ### `install.sh`
 
@@ -261,7 +261,7 @@ Only `meu` cards (with `data-rel`) open the editor; plugin/project cards are pla
 - **Request-file pattern.** Backend never executes; it leaves files for cron.
 - **Atomic writes** everywhere (`os.replace`, temp + `mv`).
 - **Bilingual via attributes** (`data-pt`/`data-en`), client-side swap; `MSG` dict in `app.js` for runtime strings.
-- **Theme**: `prefers-color-scheme` default, `data-theme` override persisted in `localStorage` (`inv-theme`).
+- **Theme**: three themes (`light`, `dark`, `sepia`); `prefers-color-scheme` default, `data-theme` override persisted in `localStorage` (`inv-theme`); the header button cycles light → dark → sepia. Assets are linked with `?v=<generation stamp>` so a cached `app.js`/`styles.css` never pairs with a newer `index.html`.
 - Comments and UI strings in Portuguese; commit messages, README and code identifiers mostly English.
 
 ## Gotchas
