@@ -27,6 +27,11 @@ Environment=PYTHONUNBUFFERED=1
 Environment=HARNESS_SOCKET=/run/harness-library/sock
 RuntimeDirectory=harness-library
 RuntimeDirectoryMode=0750
+# Keep the directory across restarts. A reverse proxy running in a container
+# bind-mounts /run/harness-library; if systemd removed and recreated it on
+# every restart, the container would keep the old, empty inode and every
+# request to the socket would fail with 502 until the container restarted.
+RuntimeDirectoryPreserve=yes
 
 ExecStart=/usr/bin/python3 @PREFIX@/api.py
 Restart=on-failure
