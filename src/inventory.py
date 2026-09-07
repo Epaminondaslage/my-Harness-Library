@@ -1972,6 +1972,8 @@ body {
   display: flex; flex-direction: column; gap: .5rem;
   min-width: 0;
 }
+/* display:flex acima venceria o [hidden] do navegador; o filtro depende disto. */
+.card[hidden] { display: none; }
 .card[data-type="agent"]   { border-left-color: var(--b-agent-fg); }
 .card[data-type="command"] { border-left-color: var(--b-command-fg); }
 .card[data-type="plugin"]  { border-left-color: var(--b-plugin-fg); }
