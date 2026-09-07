@@ -1143,6 +1143,13 @@ def build_site(items: list) -> None:
     user_str = html.escape(host_user())
 
     # ---- Cards HTML -----------------------------------------------------
+    EDIT_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+                 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                 '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>')
+    LINK_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+                 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                 '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+                 '<path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>')
     cards = []
     for it in items:
         # Link do repositorio (quando detectado); busca por API e marcada
@@ -1152,7 +1159,7 @@ def build_site(items: list) -> None:
             guess = (' <span class="repo-guess" ' + bi("provável", "likely") + '>provável</span>'
                      if it.get("repo_guess") else "")
             repo_html = (f'\n        <a class="repo-link" href="{html.escape(it["repo"])}" '
-                         f'target="_blank" rel="noopener">GitHub ↗</a>{guess}')
+                         f'target="_blank" rel="noopener">{LINK_ICON}GitHub</a>{guess}')
 
         # Cards de arquivo .md sob ~/.claude viram clicaveis: abrem o editor.
         # Os demais (plugin de marketplace, MCP) seguem estaticos.
@@ -1162,8 +1169,8 @@ def build_site(items: list) -> None:
                           f' aria-label="Editar {html.escape(it["name"], quote=True)}"')
             edit_cls = " editable"
             # Mesma linha e mesmo formato de pilula do link do GitHub.
-            edit_hint = ('\n        <span class="edit-link" '
-                         + bi("✎ Editar", "✎ Edit") + '>✎ Editar</span>')
+            edit_hint = ('\n        <span class="edit-link">' + EDIT_ICON
+                         + '<span ' + bi("Editar", "Edit") + '>Editar</span></span>')
         else:
             edit_attrs, edit_cls, edit_hint = "", "", ""
 
@@ -1177,8 +1184,15 @@ def build_site(items: list) -> None:
         # proprios (~/.claude) nao levam chip — a ausencia ja diz que sao seus.
         scope = it.get("scope", "meu")
         origin = it.get("origin", "")
+        # Sem origem nomeada, o chip diz o escopo (Meu, Instalado, ...).
+        SCOPE_PT = {"meu": "Meu", "instalado": "Instalado",
+                    "disponivel": "Disponível", "projeto": "Projeto"}
+        SCOPE_EN1 = {"meu": "Mine", "instalado": "Installed",
+                     "disponivel": "Available", "projeto": "Project"}
         origin_html = (f'<span class="origin-chip scope-{scope}">{html.escape(origin)}</span>'
-                       if origin else "")
+                       if origin else
+                       f'<span class="origin-chip scope-{scope}" {bi(SCOPE_PT[scope], SCOPE_EN1[scope])}>'
+                       f'{SCOPE_PT[scope]}</span>')
         searchable = f"{searchable} {origin}".strip().lower()
 
         # Saude do repositorio de origem. O selo so aparece no card de plugin:
@@ -1194,47 +1208,54 @@ def build_site(items: list) -> None:
                data-scope="{scope}" data-stars="{estrelas}" data-age="{dias}"
                data-name="{html.escape(it['name'].lower(), quote=True)}"{edit_attrs}
                data-search="{html.escape(searchable, quote=True)}">
-        <div class="card-head">
-          <span class="card-name">{html.escape(it['name'])}{origin_html}</span>
-          <span class="badges">
-            <span class="badge badge-cat cat-{cat}" {bi(cat_label, CATEGORY_EN[cat])}>{html.escape(cat_label)}</span>
-            <span class="badge badge-{it['type']}">{TYPE_LABEL[it['type']]}</span>
-          </span>
+        <div class="card-top">
+          <span class="card-type type-{it['type']}">{TYPE_LABEL[it['type']]}</span>
+          <span class="card-sep">·</span>
+          <span class="card-cat" {bi(cat_label, CATEGORY_EN[cat])}>{html.escape(cat_label)}</span>
+          <span class="spacer"></span>
+          {origin_html}
         </div>
+        <div class="card-name">{html.escape(it['name'])}</div>
         <p class="card-desc">{html.escape(it['desc'])}</p>
-        <p class="card-meta">{html.escape(it['meta'])}{badge_saude}{repo_html}{edit_hint}</p>
+        <div class="card-foot">
+          <span class="card-meta" title="{html.escape(it['meta'], quote=True)}">{html.escape(it['meta'])}</span>{badge_saude}{repo_html}{edit_hint}
+        </div>
       </article>""")
 
     # ---- Abas de filtro por tipo ----------------------------------------
-    tabs = [f'<button class="tab active" data-filter="all">'
-            f'<span {bi("Todas", "All")}>Todas</span> <span>{len(items)}</span></button>']
+    tabs = [f'<button class="tab active" data-filter="all" type="button">'
+            f'<span class="dot dot-all"></span>'
+            f'<span class="f-label" {bi("Todos", "All")}>Todos</span>'
+            f'<span class="f-count">{len(items)}</span></button>']
     for t, label in TYPE_LABEL.items():
         if counts[t]:
-            tabs.append(f'<button class="tab" data-filter="{t}">'
-                        f'<span {bi(label + "s", label + "s")}>{label}s</span> '
-                        f'<span>{counts[t]}</span></button>')
+            tabs.append(f'<button class="tab" data-filter="{t}" type="button">'
+                        f'<span class="dot dot-{t}"></span>'
+                        f'<span class="f-label" {bi(label + "s", label + "s")}>{label}s</span>'
+                        f'<span class="f-count">{counts[t]}</span></button>')
 
     # ---- Chips de filtro por escopo (de onde o recurso vem) -------------
     SCOPE_LABEL = {"meu": "Meus", "instalado": "Instalados",
                    "disponivel": "Disponíveis", "projeto": "De projeto"}
     scope_counts = {s: sum(1 for i in items if i.get("scope", "meu") == s) for s in SCOPE_LABEL}
-    scopes = [f'<button class="chip active" data-scope="all">'
-              f'<span {bi("Todos", "All")}>Todos</span></button>']
+    scopes = [f'<button class="chip active" data-scope="all" type="button">'
+              f'<span class="f-label" {bi("Todas", "All")}>Todas</span></button>']
     for s, label in SCOPE_LABEL.items():
         if scope_counts[s]:
-            scopes.append(f'<button class="chip chip-{s}" data-scope="{s}">'
-                          f'<span {bi(label, SCOPE_EN[s])}>{label}</span> '
-                          f'<span>{scope_counts[s]}</span></button>')
+            scopes.append(f'<button class="chip chip-{s}" data-scope="{s}" type="button">'
+                          f'<span class="f-label" {bi(label, SCOPE_EN[s])}>{label}</span>'
+                          f'<span class="f-count">{scope_counts[s]}</span></button>')
 
     # ---- Chips de filtro por categoria ----------------------------------
     cat_counts = {c: sum(1 for i in items if i.get("cat") == c) for c in CATEGORY_LABEL}
-    cat_chips = [f'<button class="chip active" data-catf="all">'
-                 f'<span {bi("Todas", "All")}>Todas</span></button>']
+    cat_chips = [f'<button class="chip active" data-catf="all" type="button">'
+                 f'<span class="f-label" {bi("Todas", "All")}>Todas</span></button>']
     for c, label in CATEGORY_LABEL.items():
         if cat_counts[c]:
-            cat_chips.append(f'<button class="chip cat-{c}" data-catf="{c}">'
-                             f'<span {bi(label, CATEGORY_EN[c])}>{label}</span> '
-                             f'<span>{cat_counts[c]}</span></button>')
+            cat_chips.append(f'<button class="chip cat-{c}" data-catf="{c}" type="button">'
+                             f'<span class="dot dot-{c}"></span>'
+                             f'<span class="f-label" {bi(label, CATEGORY_EN[c])}>{label}</span>'
+                             f'<span class="f-count">{cat_counts[c]}</span></button>')
 
     # Aviso de versao nova. So aparece quando a checagem (que roda no --online)
     # apurou que ha algo mais recente publicado.
@@ -1271,7 +1292,7 @@ def build_site(items: list) -> None:
     (function () {{
       try {{
         var t = localStorage.getItem('inv-theme');
-        if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+        if (t === 'dark' || t === 'light' || t === 'sepia') document.documentElement.dataset.theme = t;
       }} catch (e) {{}}   /* localStorage bloqueado: cai no prefers-color-scheme */
     }})();
   </script>
@@ -1279,31 +1300,46 @@ def build_site(items: list) -> None:
 </head>
 <body>
   <header class="topbar">
-    <h1>My Harness Library</h1>
-    <div class="topbar-right">
+    <div class="topbar-left">
+      <span class="topbar-logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"><path d="M9 10h14M9 16h14M9 22h9"/></svg>
+      </span>
+      <h1>My Harness Library</h1>
       <span class="topbar-info"
             {bi(f"{len(items)} recursos · {with_repo} com repositório · gerado em {generated}",
                 f"{len(items)} resources · {with_repo} with repository · generated {generated}")}>
         {len(items)} recursos · {with_repo} com repositório · gerado em {generated}</span>
-      <button id="lang-btn" class="icon-btn" type="button"
-              {bit("Switch to English", "Mudar para português")}
-              title="Switch to English"><span id="lang-flag">🇺🇸</span></button>
-      <button id="pw-btn" class="icon-btn" type="button"
-              {bit("Trocar a senha de gravação", "Change the write password")}
-              title="Trocar a senha de gravação">🔑</button>
-      <button id="regen-btn" class="icon-btn" type="button"
+    </div>
+    <div class="topbar-right">
+      <button id="regen-btn" class="tb-btn" type="button"
               {bit("Regenerar o inventário agora", "Regenerate the inventory now")}
-              title="Regenerar o inventário agora">↻</button>
-      <button id="new-btn" class="new-btn" type="button"
-              {bit("Criar skill, agent ou command", "Create skill, agent or command")}
-              title="Criar skill, agent ou command"><span {bi("+ Novo", "+ New")}>+ Novo</span></button>
+              title="Regenerar o inventário agora">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        <span class="tb-label" {bi("Regenerar", "Regenerate")}>Regenerar</span>
+      </button>
+      <button id="pw-btn" class="tb-btn" type="button"
+              {bit("Trocar a senha de gravação", "Change the write password")}
+              title="Trocar a senha de gravação">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span class="tb-label" {bi("Senha", "Password")}>Senha</span>
+      </button>
+      <button id="lang-btn" class="tb-btn" type="button"
+              {bit("Switch to English", "Mudar para português")}
+              title="Switch to English">
+        <span id="lang-cur" class="lang-cur">PT</span><span class="lang-sep">|</span><span id="lang-alt" class="lang-alt">EN</span>
+      </button>
       <button id="theme-toggle" class="theme-toggle" type="button"
-              aria-label="Alternar tema claro/escuro"
-              {bit("Alternar tema claro/escuro", "Toggle light/dark theme")}
-              title="Alternar tema claro/escuro">
+              aria-label="Alternar tema (claro, escuro, sépia)"
+              {bit("Alternar tema: claro → escuro → sépia", "Switch theme: light → dark → sepia")}
+              title="Alternar tema: claro → escuro → sépia">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <svg class="icon-book" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1311,56 +1347,74 @@ def build_site(items: list) -> None:
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
         </svg>
       </button>
+      <button id="new-btn" class="new-btn" type="button"
+              {bit("Criar skill, agent ou command", "Create skill, agent or command")}
+              title="Criar skill, agent ou command">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span {bi("Novo recurso", "New resource")}>Novo recurso</span>
+      </button>
     </div>
   </header>
 
-  <main class="container">
-    <!-- Procedencia: de qual maquina, diretorio e usuario veio este inventario -->
-    <section class="origin">
-      <h2 class="origin-title">My Harness Library</h2>
-      <dl class="origin-list">
-        <div><dt {bi("Host", "Host")}>Host</dt><dd>{ip_str} <span class="origin-alt">({host_str})</span></dd></div>
-        <div><dt {bi("Diretório", "Directory")}>Diretório</dt><dd>{base_str}</dd></div>
-        <div><dt {bi("Usuário", "User")}>Usuário</dt><dd>{user_str}</dd></div>
-        <div><dt {bi("Versão", "Version")}>Versão</dt><dd>{html.escape(versao or "?")}</dd></div>
-      </dl>
-    </section>
+  <div class="layout">
+    <!-- Filtros: tipo, origem e finalidade em secoes verticais; procedencia no rodape -->
+    <aside class="sidebar" aria-label="Filtros">
+      <section class="f-section">
+        <div class="f-title" {bi("Tipo", "Type")}>Tipo</div>
+        <nav class="f-list tabs">{''.join(tabs)}</nav>
+      </section>
+      <section class="f-section">
+        <div class="f-title" {bi("Origem", "Source")}>Origem</div>
+        <div class="f-list chips">{''.join(scopes)}</div>
+      </section>
+      <section class="f-section">
+        <div class="f-title" {bi("Finalidade", "Purpose")}>Finalidade</div>
+        <div class="f-list chips">{''.join(cat_chips)}</div>
+      </section>
+      <section class="f-origin">
+        <div class="f-title" {bi("Procedência", "Origin")}>Procedência</div>
+        <code>{user_str}@{ip_str} <span class="origin-alt">({host_str})</span></code>
+        <code>{base_str}</code>
+        <code><span {bi("versão", "version")}>versão</span> {html.escape(versao or "?")}</code>
+      </section>
+    </aside>
+
+    <main class="content">
 {update_banner}
-
-    <input id="search" class="search" type="text"
-           data-pt-ph="Buscar por nome ou descrição..."
-           data-en-ph="Search by name or description..."
-           placeholder="Buscar por nome ou descrição...">
-
-    <nav class="tabs">{''.join(tabs)}</nav>
-
-    <div class="filters">
-      <div class="filter-row">
-        <span class="filter-label" {bi("Origem", "Source")}>Origem</span>
-        <div class="chips">{''.join(scopes)}</div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="search" class="search" type="search"
+               data-pt-ph="Buscar por nome ou descrição..."
+               data-en-ph="Search by name or description..."
+               placeholder="Buscar por nome ou descrição...">
+        <span class="search-kbd" aria-hidden="true">/</span>
       </div>
-      <div class="filter-row">
-        <span class="filter-label" {bi("Finalidade", "Purpose")}>Finalidade</span>
-        <div class="chips">{''.join(cat_chips)}</div>
-      </div>
-      <div class="filter-row">
-        <span class="filter-label" {bi("Ordenar", "Sort")}>Ordenar</span>
-        <div class="chips">
-          <button class="chip active" data-sort="padrao" {bi("Padrão", "Default")}>Padrão</button>
-          <button class="chip" data-sort="estrelas" {bi("Mais estrelas", "Most stars")}>Mais estrelas</button>
-          <button class="chip" data-sort="recentes" {bi("Atualizados", "Recently updated")}>Atualizados</button>
-          <button class="chip" data-sort="nome" {bi("Nome", "Name")}>Nome</button>
-        </div>
-      </div>
-    </div>
 
-    <section id="grid" class="grid">{''.join(cards)}
-    </section>
+      <div class="resultbar">
+        <span><strong id="count">{len(items)}</strong> <span {bi("recursos", "resources")}>recursos</span></span>
+        <span id="active-filters" class="active-filters"></span>
+        <button id="clear-filters" class="af-clear" type="button" hidden
+                {bi("Limpar filtros", "Clear filters")}>Limpar filtros</button>
+        <span class="resultbar-spacer"></span>
+        <label class="sort-wrap">
+          <span {bi("Ordenar por", "Sort by")}>Ordenar por</span>
+          <select id="sort" class="sort">
+            <option value="padrao" {bi("Padrão", "Default")}>Padrão</option>
+            <option value="estrelas" {bi("Mais estrelas", "Most stars")}>Mais estrelas</option>
+            <option value="recentes" {bi("Atualizados", "Recently updated")}>Atualizados</option>
+            <option value="nome" {bi("Nome", "Name")}>Nome</option>
+          </select>
+        </label>
+      </div>
 
-    <p id="empty" class="empty" hidden
-       {bi("Nenhum recurso encontrado para este filtro.", "No resources match this filter.")}>
-       Nenhum recurso encontrado para este filtro.</p>
-  </main>
+      <section id="grid" class="grid">{''.join(cards)}
+      </section>
+
+      <p id="empty" class="empty" hidden
+         {bi("Nenhum recurso encontrado para este filtro.", "No resources match this filter.")}>
+         Nenhum recurso encontrado para este filtro.</p>
+    </main>
+  </div>
 
   <!-- ===================================================================
        Editor de markdown (modal). Abre ao clicar num card de arquivo .md
@@ -1521,13 +1575,15 @@ def build_site(items: list) -> None:
    Padrao SPS Design System (TIPO 2): header branco 56px, fundo #f0f0f0,
    cards brancos, acento teal #0d9488, botoes raio 8px.
 
-   Tema claro/escuro por tokens CSS. Tres estados:
+   Temas por tokens CSS. Quatro estados:
      :root                      -> paleta clara (padrao)
      @media prefers-color-scheme -> escuro quando o SO pede e o usuario
                                     nao escolheu (guardado por :not([data-theme="light"]))
      :root[data-theme="dark"]   -> escolha explicita no botao do topo
+     :root[data-theme="sepia"]  -> tema sepia (papel), escolha explicita
    Nenhuma cor pode existir SO dentro do media query: o toggle precisa
-   vencer nos dois sentidos.
+   vencer em todos os sentidos. O sepia so redefine os tokens base; os
+   de badge/categoria herdam do claro.
 ====================================================================== */
 
 :root {
@@ -1621,6 +1677,23 @@ def build_site(items: list) -> None:
   --c-outros-bg:      #2d3748; --c-outros-fg:      #9ca3af;
 }
 
+/* ---- Tema sepia: fundo papel, tinta marrom, acento ambar ---- */
+:root[data-theme="sepia"] {
+  --bg:          #efe6d3;
+  --fg:          #3b2f21;
+  --surface:     #faf4e6;
+  --border:      #e3d7bf;
+  --border-str:  #cdbb9a;
+  --muted:       #7a6a52;
+  --muted-2:     #a3927a;
+  --strong:      #2b2115;
+  --body-txt:    #4d3f2e;
+  --accent:      #a16207;
+  --accent-soft: #f6e7b8;
+  --shadow:      rgba(80, 60, 20, .08);
+  --warn:        #b45309;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -1638,16 +1711,52 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: .75rem;
-  padding: 0 1.25rem;
+  padding: 0 1.5rem;
   position: sticky;
   top: 0;
   z-index: 10;
 }
-.topbar h1 { font-size: 1.05rem; color: var(--accent); }
-.topbar-right { display: flex; align-items: center; gap: .75rem; }
-.topbar-info { font-size: .78rem; color: var(--muted); }
+.topbar-left { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.topbar-logo {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  background: var(--accent);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.topbar-logo svg { width: 18px; height: 18px; }
+.topbar h1 { font-size: 1rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.topbar-info {
+  font-size: .75rem; color: var(--muted-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
 
-/* ---- Botao de tema (canto superior direito) ---- */
+/* Botoes do topo: icone + rotulo. Em tela estreita fica so o icone. */
+.tb-btn {
+  height: 34px;
+  padding: 0 .7rem;
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--body-txt);
+  font-family: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.tb-btn:hover { color: var(--accent); border-color: var(--accent); }
+.tb-btn:focus-visible, .theme-toggle:focus-visible, .new-btn:focus-visible,
+.tab:focus-visible, .chip:focus-visible, .af-pill:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.lang-cur { font-weight: 600; }
+.lang-sep { color: var(--border-str); margin: 0 .3rem; }
+.lang-alt { color: var(--muted-2); }
+
+/* ---- Botao de tema: o icone mostra o PROXIMO tema (claro -> escuro -> sepia) ---- */
 .theme-toggle {
   flex-shrink: 0;
   width: 34px;
@@ -1662,57 +1771,102 @@ body {
   line-height: 0;
 }
 .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
-.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .theme-toggle svg { width: 18px; height: 18px; }
-/* Mostra o sol no escuro e a lua no claro (o icone indica o destino). */
-.icon-sun  { display: none; }
-:root[data-theme="dark"] .icon-sun  { display: block; }
-:root[data-theme="dark"] .icon-moon { display: none; }
+.icon-moon { display: block; }
+.icon-book, .icon-sun { display: none; }
+:root[data-theme="dark"]  .icon-moon { display: none; }
+:root[data-theme="dark"]  .icon-book { display: block; }
+:root[data-theme="sepia"] .icon-moon { display: none; }
+:root[data-theme="sepia"] .icon-sun  { display: block; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .icon-sun  { display: block; }
-  :root:not([data-theme="light"]) .icon-moon { display: none; }
+  :root:not([data-theme]) .icon-moon { display: none; }
+  :root:not([data-theme]) .icon-book { display: block; }
 }
-:root[data-theme="light"] .icon-sun  { display: none; }
-:root[data-theme="light"] .icon-moon { display: block; }
 
-@media (max-width: 640px) { .topbar-info { display: none; } }
-
-.container { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
-
-/* ---- Bloco de procedencia (titulo + host/diretorio/usuario) ---- */
-.origin {
+/* ---- Layout: sidebar de filtros + conteudo ---- */
+.layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+}
+.f-section {
   background: var(--surface);
   border-radius: 8px;
-  border-left: 4px solid var(--accent);
   box-shadow: 0 1px 2px var(--shadow);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1rem;
+  padding: .7rem .5rem;
 }
-.origin-title {
-  font-size: 1.35rem;
-  font-weight: 600;
-  color: var(--strong);
-  margin-bottom: .7rem;
-}
-.origin-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: .55rem 1.5rem;
-}
-.origin-list dt {
+.f-title {
   font-size: .68rem;
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--muted-2);
-  margin-bottom: .12rem;
+  padding: 0 .5rem .5rem;
 }
-.origin-list dd {
-  font-family: "SF Mono", Menlo, Consolas, monospace;
-  font-size: .85rem;
+.f-list { display: flex; flex-direction: column; gap: 2px; }
+
+/* Itens de filtro (tipo, origem, finalidade): linha com ponto de cor, rotulo e contagem */
+.tab, .chip {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 .6rem;
+  display: flex; align-items: center; gap: .6rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
   color: var(--body-txt);
-  word-break: break-all;
+  font-family: inherit;
+  font-size: .82rem;
+  text-align: left;
+  cursor: pointer;
 }
-.origin-alt { color: var(--muted-2); font-size: .78rem; }
+.tab:hover, .chip:hover { background: var(--bg); }
+.tab.active, .chip.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.f-label { flex: 1; min-width: 0; }
+.f-count { color: var(--muted-2); font-weight: 400; font-size: .76rem; }
+.tab.active .f-count, .chip.active .f-count { color: inherit; opacity: .8; }
+.dot { width: 8px; height: 8px; border-radius: 99px; background: var(--muted-2); flex-shrink: 0; }
+.dot-all, .dot-skill { background: var(--accent); }
+.dot-agent   { background: var(--b-agent-fg); }
+.dot-command { background: var(--b-command-fg); }
+.dot-plugin  { background: var(--b-plugin-fg); }
+.dot-mcp     { background: var(--b-mcp-fg); }
+.dot-geral       { background: var(--c-geral-fg); }
+.dot-devops      { background: var(--c-devops-fg); }
+.dot-spec-ops    { background: var(--c-spec-ops-fg); }
+.dot-qualidade   { background: var(--c-qualidade-fg); }
+.dot-seguranca   { background: var(--c-seguranca-fg); }
+.dot-integracoes { background: var(--c-integracoes-fg); }
+.dot-ferramental { background: var(--c-ferramental-fg); }
+.dot-frontend    { background: var(--c-frontend-fg); }
+.dot-outros      { background: var(--c-outros-fg); }
+
+/* Procedencia (host, diretorio, versao) no rodape da sidebar */
+.f-origin { padding: 0 .5rem; display: flex; flex-direction: column; gap: .3rem; }
+.f-origin .f-title { padding: 0 0 .2rem; }
+.f-origin code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: .72rem;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.4;
+}
+.origin-alt { color: var(--muted-2); }
+
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .9rem; }
 
 /* ---- Aviso de versao nova ---- */
 .update-banner {
@@ -1724,7 +1878,6 @@ body {
   color: var(--c-integracoes-fg);
   border-radius: 8px;
   padding: .6rem .9rem;
-  margin-bottom: 1rem;
   font-size: .82rem;
   font-weight: 500;
 }
@@ -1740,104 +1893,114 @@ body {
 }
 
 /* ---- Campo de busca ---- */
+.search-wrap { position: relative; }
+.search-wrap > svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; color: var(--muted-2); pointer-events: none;
+}
 .search {
   width: 100%;
-  padding: .7rem 1rem;
+  height: 46px;
+  padding: 0 3rem 0 2.75rem;
   border: 1px solid var(--border-str);
   border-radius: 8px;
+  font-family: inherit;
   font-size: .95rem;
-  margin-bottom: 1rem;
   background: var(--surface);
   color: var(--fg);
+  -webkit-appearance: none; appearance: none;
 }
 .search::placeholder { color: var(--muted-2); }
 .search:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.search-kbd {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: .68rem; color: var(--muted-2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px;
+}
 
-/* ---- Abas de filtro por tipo ---- */
-.tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
-.tab {
+/* ---- Barra de resultado: contagem, filtros ativos, ordenacao ---- */
+.resultbar {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  font-size: .82rem; color: var(--body-txt);
+  min-height: 32px;
+}
+.resultbar strong { color: var(--strong); }
+.active-filters { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+.af-pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  height: 26px; padding: 0 .3rem 0 .6rem;
+  border-radius: 99px; border: none;
+  background: var(--accent-soft); color: var(--accent);
+  font-family: inherit; font-size: .75rem; font-weight: 500;
+  cursor: pointer;
+}
+.af-pill svg { width: 14px; height: 14px; }
+.af-pill:hover { background: var(--accent); color: var(--surface); }
+.af-clear {
+  background: none; border: none; padding: 0;
+  color: var(--muted); font-family: inherit; font-size: .75rem;
+  text-decoration: underline; cursor: pointer;
+}
+.af-clear:hover { color: var(--accent); }
+.resultbar-spacer { flex: 1; }
+.sort-wrap { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); }
+.sort {
+  height: 32px; padding: 0 .6rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--body-txt);
+  font-family: inherit; font-size: .82rem; font-weight: 500;
+  cursor: pointer;
+}
+
+/* ---- Grade de cards ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: .9rem;
+}
+/* A cor da borda esquerda diz o tipo; o rotulo em cima confirma. */
+.card {
   background: var(--surface);
-  color: var(--body-txt);
-  padding: .45rem 1rem;
   border-radius: 8px;
-  font-size: .85rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--border);
+  padding: .9rem 1rem;
+  border-left: 4px solid var(--accent);
+  box-shadow: 0 1px 2px var(--shadow);
+  display: flex; flex-direction: column; gap: .5rem;
+  min-width: 0;
 }
-.tab span { color: var(--muted-2); margin-left: .3rem; font-weight: 400; }
-.tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-.tab.active span { color: var(--bg); opacity: .7; }
+.card[data-type="agent"]   { border-left-color: var(--b-agent-fg); }
+.card[data-type="command"] { border-left-color: var(--b-command-fg); }
+.card[data-type="plugin"]  { border-left-color: var(--b-plugin-fg); }
+.card[data-type="mcp"]     { border-left-color: var(--b-mcp-fg); }
+/* Recurso apenas catalogado fica visualmente mais fraco que o instalado. */
+.card[data-scope="disponivel"] { opacity: .8; }
+.card[data-scope="disponivel"]:hover { opacity: 1; }
 
-/* ---- Chips de filtro (origem e finalidade) ---- */
-.filters { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: .5rem; }
-.filter-row { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
-.filter-label {
-  font-size: .68rem;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--muted-2);
-  min-width: 68px;
-}
-.chips { display: flex; flex-wrap: wrap; gap: .35rem; }
-.chip {
-  background: var(--surface);
-  color: var(--body-txt);
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: .25rem .7rem;
-  font-size: .76rem;
-  cursor: pointer;
-}
-.chip span { color: var(--muted-2); margin-left: .25rem; }
-.chip:hover { border-color: var(--accent); }
-.chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
-  font-weight: 500;
-}
-.chip.active span { color: var(--bg); opacity: .75; }
+.card-top { display: flex; align-items: center; gap: .45rem; font-size: .68rem; min-width: 0; }
+.card-type { font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.card-type.type-agent   { color: var(--b-agent-fg); }
+.card-type.type-command { color: var(--b-command-fg); }
+.card-type.type-plugin  { color: var(--b-plugin-fg); }
+.card-type.type-mcp     { color: var(--b-mcp-fg); }
+.card-sep { color: var(--border-str); }
+.card-cat { color: var(--muted); white-space: nowrap; }
+.card-top .spacer { flex: 1; }
 
-/* Chip de origem no titulo do card */
+/* Chip de procedencia (meu, plugin de origem, projeto) */
 .origin-chip {
-  margin-left: .45rem;
-  padding: .05rem .45rem;
-  border-radius: 99px;
-  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: .62rem;
+  font-size: .68rem;
   font-weight: 500;
-  vertical-align: middle;
+  padding: .1rem .5rem;
+  border-radius: 99px;
   white-space: nowrap;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
 }
+.origin-chip.scope-meu        { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
 .origin-chip.scope-instalado  { background: var(--c-ferramental-bg); color: var(--c-ferramental-fg); }
 .origin-chip.scope-disponivel { background: var(--c-outros-bg);      color: var(--c-outros-fg); }
 .origin-chip.scope-projeto    { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
 
-/* Recurso apenas catalogado fica visualmente mais fraco que o instalado. */
-.card[data-scope="disponivel"] { opacity: .82; border-left-color: var(--border-str); }
-.card[data-scope="disponivel"]:hover { opacity: 1; }
-
-/* ---- Grade de cards brancos ---- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
-}
-.card {
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 1rem 1.1rem;
-  border-left: 4px solid var(--accent);
-  box-shadow: 0 1px 2px var(--shadow);
-}
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .5rem;
-  margin-bottom: .45rem;
-}
 .card-name {
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: .95rem;
@@ -1845,74 +2008,47 @@ body {
   color: var(--strong);
   word-break: break-word;
 }
-.card-desc { font-size: .85rem; line-height: 1.45; color: var(--body-txt); }
-.card-meta {
-  margin-top: .6rem;
-  font-size: .72rem;
-  color: var(--muted-2);
-  word-break: break-all;
+.card-desc {
+  font-size: .82rem; line-height: 1.5; color: var(--body-txt);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-
-/* ---- Selo de saude do repositorio de origem ---- */
-.health { display: inline-flex; gap: .3rem; margin-left: .45rem; vertical-align: middle; }
-.hl-stars, .hl-age {
-  padding: .05rem .4rem;
-  border-radius: 99px;
-  font-size: .66rem;
-  font-weight: 500;
-  white-space: nowrap;
+.card-foot {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin-top: .15rem; padding-top: .6rem;
+  border-top: 1px solid var(--border);
+  font-size: .7rem; color: var(--muted);
+  min-width: 0;
 }
-.hl-stars { background: var(--c-integracoes-bg); color: var(--c-integracoes-fg); }
-.hl-fresh { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
-.hl-ok    { background: var(--c-geral-bg);       color: var(--c-geral-fg); }
-.hl-stale { background: var(--c-seguranca-bg);   color: var(--c-seguranca-fg); }
+.card-meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- Link do repositorio GitHub ---- */
-.repo-link {
-  display: inline-block;
-  margin-left: .5rem;
-  padding: .1rem .55rem;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 99px;
-  font-weight: 500;
+/* ---- Saude do repositorio: estrelas e atividade em texto discreto ---- */
+.health { display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.hl-stars { color: var(--c-integracoes-fg); font-weight: 500; }
+.hl-fresh { color: var(--c-devops-fg); }
+.hl-ok    { color: var(--muted); }
+.hl-stale { color: var(--c-seguranca-fg); }
+
+/* ---- Acoes do card: GitHub e Editar como botoes ---- */
+.repo-link, .edit-link {
+  display: inline-flex; align-items: center; gap: .3rem;
+  height: 28px; padding: 0 .6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--body-txt);
+  font-size: .75rem; font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
+  flex-shrink: 0;
 }
-.repo-link:hover { background: var(--accent); color: var(--bg); }
+.repo-link svg, .edit-link svg { width: 13px; height: 13px; }
+.repo-link:hover { border-color: var(--accent); color: var(--accent); }
 .repo-guess {                     /* marca resultados vindos de busca (camada d) */
-  margin-left: .3rem;
   font-size: .65rem;
   color: var(--warn);
   font-style: italic;
 }
-
-/* ---- Badges por tipo de recurso ---- */
-.badge {
-  flex-shrink: 0;
-  font-size: .68rem;
-  font-weight: 600;
-  padding: .18rem .55rem;
-  border-radius: 99px;
-}
-/* ---- Badge de categoria (finalidade) ---- */
-.badges { display: flex; align-items: center; gap: .3rem; flex-shrink: 0; }
-.badge-cat { font-weight: 500; }
-.cat-geral       { background: var(--c-geral-bg);       color: var(--c-geral-fg); }
-.cat-devops      { background: var(--c-devops-bg);      color: var(--c-devops-fg); }
-.cat-spec-ops    { background: var(--c-spec-ops-bg);    color: var(--c-spec-ops-fg); }
-.cat-qualidade   { background: var(--c-qualidade-bg);   color: var(--c-qualidade-fg); }
-.cat-seguranca   { background: var(--c-seguranca-bg);   color: var(--c-seguranca-fg); }
-.cat-integracoes { background: var(--c-integracoes-bg); color: var(--c-integracoes-fg); }
-.cat-ferramental { background: var(--c-ferramental-bg); color: var(--c-ferramental-fg); }
-.cat-frontend    { background: var(--c-frontend-bg);    color: var(--c-frontend-fg); }
-.cat-outros      { background: var(--c-outros-bg);      color: var(--c-outros-fg); }
-
-.badge-skill   { background: var(--accent-soft);   color: var(--accent); }
-.badge-agent   { background: var(--b-agent-bg);    color: var(--b-agent-fg); }
-.badge-command { background: var(--b-command-bg);  color: var(--b-command-fg); }
-.badge-plugin  { background: var(--b-plugin-bg);   color: var(--b-plugin-fg); }
-.badge-mcp     { background: var(--b-mcp-bg);      color: var(--b-mcp-fg); }
+.edit-link { border-color: var(--accent); color: var(--accent); }
+.card.editable:hover .edit-link { background: var(--accent); color: var(--surface); }
 
 .empty { text-align: center; color: var(--muted); padding: 2rem 0; }
 
@@ -1921,19 +2057,28 @@ body {
 .card.editable:hover { box-shadow: 0 3px 10px var(--shadow); transform: translateY(-1px); }
 .card.editable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Pilula "Editar": mesma linha e mesma forma do link do GitHub, sempre
-   visivel — sinaliza a acao sem depender de hover (que nao existe no touch). */
-.edit-link {
-  display: inline-block;
-  margin-left: .5rem;
-  padding: .1rem .55rem;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 99px;
-  font-weight: 500;
-  white-space: nowrap;
+/* ---- Telas estreitas: sidebar vira faixa horizontal de secoes ---- */
+@media (max-width: 900px) {
+  .topbar { padding: 0 .75rem; gap: .5rem; }
+  .topbar-left { overflow: hidden; }
+  .topbar-logo, .topbar-info, .tb-label, .search-kbd { display: none; }
+  .topbar h1 { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-right { gap: .35rem; }
+  .tb-btn { padding: 0 .55rem; }
+  .new-btn span { display: none; }
+  .new-btn { padding: 0 .6rem; }
+  .layout { flex-direction: column; padding: .9rem 1rem 2.5rem; gap: .9rem; }
+  .sidebar {
+    position: static; width: 100%; max-height: none;
+    flex-direction: row; gap: .6rem;
+    overflow-x: auto; overflow-y: hidden;
+    padding-bottom: .25rem;
+  }
+  .f-section { flex-shrink: 0; min-width: 190px; max-height: 240px; overflow-y: auto; }
+  .f-origin { display: none; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .card-meta { flex-basis: 100%; }
 }
-.card.editable:hover .edit-link { background: var(--accent); color: var(--bg); }
 
 /* =====================================================================
    Modal do editor markdown
@@ -2120,6 +2265,9 @@ body {
 .new-btn {
   flex-shrink: 0;
   height: 34px;
+  margin-left: .25rem;
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-family: inherit;
   padding: 0 .8rem;
   background: var(--accent);
   border: 1px solid var(--accent);
@@ -2131,6 +2279,7 @@ body {
   white-space: nowrap;
 }
 .new-btn:hover { opacity: .9; }
+.new-btn svg { width: 16px; height: 16px; }
 
 /* ---- Painel de historico (sobrepoe o preview) ---- */
 .ed-hist {
@@ -2250,7 +2399,64 @@ function apply() {
     if (show) visible++;
   });
   empty.hidden = visible > 0;
+  document.getElementById('count').textContent = visible;
+  renderActiveFilters();
 }
+
+/* ---------------------------------------------------------------------
+   Barra de resultado: um pill por filtro ativo (com x para tirar so
+   aquele) e "Limpar filtros" quando ha qualquer coisa aplicada.
+--------------------------------------------------------------------- */
+const activeBox = document.getElementById('active-filters');
+const clearBtn  = document.getElementById('clear-filters');
+const X_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+              'stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+/* Cada grupo: seletor do botao ativo, atributo do valor e valor atual. */
+const GROUPS = [
+  { sel: '.tab',               attr: 'filter', get: () => activeFilter },
+  { sel: '.chip[data-scope]',  attr: 'scope',  get: () => activeScope  },
+  { sel: '.chip[data-catf]',   attr: 'catf',   get: () => activeCat    },
+];
+
+function renderActiveFilters() {
+  activeBox.innerHTML = '';
+  let n = 0;
+  GROUPS.forEach(g => {
+    if (g.get() === 'all') return;
+    const lbl = document.querySelector(g.sel + '.active .f-label');
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'af-pill';
+    pill.textContent = lbl ? lbl.textContent : g.get();
+    pill.insertAdjacentHTML('beforeend', X_SVG);
+    pill.title = t('removeFilter');
+    pill.addEventListener('click', () => {
+      document.querySelector(g.sel + '[data-' + g.attr + '="all"]').click();
+    });
+    activeBox.appendChild(pill);
+    n++;
+  });
+  clearBtn.hidden = n === 0 && !search.value;
+}
+
+clearBtn.addEventListener('click', () => {
+  search.value = '';
+  GROUPS.forEach(g => {
+    const all = document.querySelector(g.sel + '[data-' + g.attr + '="all"]');
+    if (all && !all.classList.contains('active')) all.click();
+  });
+  apply();
+});
+
+/* Atalho "/" foca a busca (fora de campos de texto e modais). */
+document.addEventListener('keydown', ev => {
+  if (ev.key !== '/' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag) || document.activeElement.isContentEditable) return;
+  if (document.querySelector('.modal:not([hidden])')) return;
+  ev.preventDefault();
+  search.focus();
+});
 
 /* =====================================================================
    Idioma (pt-BR / en)
@@ -2292,6 +2498,7 @@ const MSG = {
     passChanged:   'Senha trocada. Use a nova daqui em diante.',
     nameBad:       'Nome inválido. Use minúsculas, números e hífen.',
     needPassAny:   'Informe a senha.',
+    removeFilter:  'Remover este filtro',
     // erros devolvidos pelo backend, por codigo
     e_senha:       'Senha incorreta.',
     e_conflito:    'O arquivo mudou no disco desde que você abriu. Recarregue antes de salvar.',
@@ -2333,6 +2540,7 @@ const MSG = {
     passChanged:   'Password changed. Use the new one from now on.',
     nameBad:       'Invalid name. Use lowercase, digits and hyphen.',
     needPassAny:   'Enter the password.',
+    removeFilter:  'Remove this filter',
     e_senha:       'Wrong password.',
     e_conflito:    'The file changed on disk since you opened it. Reload before saving.',
     e_existe:      'A file already exists at that path.',
@@ -2385,9 +2593,10 @@ function applyLang() {
     if (v !== undefined) el.placeholder = v;
   });
   document.documentElement.lang = LANG === 'en' ? 'en' : 'pt-BR';
-  // A bandeira mostra o idioma de DESTINO, como o icone do tema.
-  const flag = document.getElementById('lang-flag');
-  if (flag) flag.textContent = LANG === 'en' ? '🇧🇷' : '🇺🇸';
+  // "PT | EN": o idioma atual em negrito, o outro apagado.
+  document.getElementById('lang-cur').textContent = LANG === 'en' ? 'EN' : 'PT';
+  document.getElementById('lang-alt').textContent = LANG === 'en' ? 'PT' : 'EN';
+  renderActiveFilters();   // os pills usam o rotulo traduzido
 }
 
 document.getElementById('lang-btn').addEventListener('click', () => {
@@ -2458,24 +2667,18 @@ function sortBy(modo) {
   lista.forEach(c => grid.appendChild(c));
 }
 
-const chipsOrdem = document.querySelectorAll('.chip[data-sort]');
-chipsOrdem.forEach(chip => {
-  chip.addEventListener('click', () => {
-    chipsOrdem.forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    sortBy(chip.dataset.sort);
-  });
-});
+document.getElementById('sort').addEventListener('change', ev => sortBy(ev.target.value));
 
 wireChips('catf',  v => { activeCat   = v; });
 
 /* ---------------------------------------------------------------------
-   Tema claro/escuro
+   Tema: claro -> escuro -> sepia -> claro
    Sem data-theme no <html>, o CSS segue o prefers-color-scheme do SO.
    O primeiro clique grava a escolha explicita, que passa a vencer o SO.
    O estado inicial ja foi aplicado pelo script inline do <head>.
 --------------------------------------------------------------------- */
 const themeBtn = document.getElementById('theme-toggle');
+const THEMES = ['light', 'dark', 'sepia'];
 
 /** Tema em vigor agora — o explicito, ou o que o SO pede. */
 function currentTheme() {
@@ -2484,7 +2687,7 @@ function currentTheme() {
 }
 
 themeBtn.addEventListener('click', () => {
-  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem('inv-theme', next); } catch (e) {}
 });
