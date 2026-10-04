@@ -25,6 +25,7 @@ On a typical installation the difference is stark: the Claude Code plugin list s
 - [Uninstalling](#uninstalling)
 - [Troubleshooting](#troubleshooting)
 - [Project layout](#project-layout)
+- [Orquestra: coordinating sessions](#orquestra-coordinating-claude-code-sessions)
 - [Codebase map](#codebase-map)
 - [Notes for contributors](#notes-for-contributors)
 - [License](#license)
@@ -465,6 +466,26 @@ my-Harness-Library/
 Nothing is generated at build time and no dependency is vendored. What you read is what runs.
 
 ---
+
+## Orquestra: coordinating Claude Code sessions
+
+A separate, optional piece in `orquestra/` (stdlib Python, no service). When several
+Claude Code sessions run on one machine, user-level hooks keep them from stepping on
+each other: a per-product **deploy lock** (`coolify deploy`, `docker compose up|build|restart`,
+the `deploy-prod` / `tarefa-finalizada` skills) that denies a concurrent deploy, a denial of
+**`git checkout`/`switch`** in a working tree another live session is using, a **warning**
+(never a block) when two sessions edit the same file, and notes delivered between
+sessions. The `/orquestra` skill shows who is where and which branches or PRs touch the
+same files. Hooks fail open: an internal error never blocks a session.
+
+```bash
+bash orquestra/install.sh          # copies to ~/.claude and registers the hooks (backs up settings.json)
+$EDITOR ~/.claude/orquestra/produtos.json   # your products: paths, Coolify names
+touch ~/.claude/orquestra/DESLIGADO         # kill switch
+bash orquestra/uninstall.sh
+```
+
+Design and measurements: `docs/superpowers/specs/2026-10-04-orquestra-design.md`.
 
 ## Codebase map
 
