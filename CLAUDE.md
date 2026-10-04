@@ -6,6 +6,7 @@ Self-hosted, offline-first inventory and editor for a Claude Code installation. 
 
 **Stack**: Python 3.9+ stdlib only, bash, systemd, nginx, cron. No pip, no npm, no build step: `app.js` and `styles.css` are raw strings inside `inventory.py`.
 **Structure**: `src/` (generator, backend, install/uninstall/regenerate scripts, systemd unit template), `install.sh` (curl bootstrap), `docs/`, `.github/workflows/ci.yml`.
+**Orquestra** (`orquestra/`): separate optional tool, hooks + `/orquestra` skill that coordinate concurrent Claude Code sessions (deploy lock, branch-switch guard, edit-overlap warning). Installed into `~/.claude` by `orquestra/install.sh`, independent of the inventory server; tests: `python3 -m unittest discover -s orquestra/tests`.
 
 Runtime on the server: `/opt/harness-library` (what runs, root-owned; deploy via `install.sh | sudo bash` after commit+push, never edit there), `/var/www/html/my-harness-library` (generated), `~/.claude/.inventory/` (state: password hash, audit log, status, caches).
 

@@ -1,0 +1,17 @@
+{
+  "prazo_deploy_fundo_min": 15,
+  "prazo_deploy_min": 15,
+  "prazo_skill_min": 60,
+  "prazo_sessao_sem_registro_min": 30,
+  "skills_deploy": {
+    "deploy-prod": "prod",
+    "tarefa-finalizada": "dev"
+  },
+  "produtos": {
+    "meu-produto": {
+      "caminhos": ["/opt/meu-produto", "/opt/meu-produto-worktrees/*", "~/worktrees/meu-produto-*"],
+      "coolify": ["meu-produto", "meu-produto-backend"],
+      "branch_base": "origin/main"
+    }
+  }
+}

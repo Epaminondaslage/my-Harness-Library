@@ -17,6 +17,8 @@ jobs:
           bash -n src/setup.sh
           bash -n src/regenerate.sh
           bash -n src/uninstall.sh
+          bash -n orquestra/install.sh
+          bash -n orquestra/uninstall.sh
 
       - name: Backend answers over its socket
         run: |
@@ -35,6 +37,13 @@ jobs:
 
       - name: Python syntax
         run: python3 -m py_compile src/inventory.py src/api.py
+
+      - name: Orquestra tests
+        run: |
+          python3 -m py_compile orquestra/orquestra.py
+          git config --global user.email ci@example.com
+          git config --global user.name ci
+          python3 -m unittest discover -s orquestra/tests
 
       - name: systemd unit template is well formed
         run: |

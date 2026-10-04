@@ -1,6 +1,6 @@
 # Orquestra: coordenação entre sessões do Claude Code na mesma máquina
 
-Data: 2026-10-04 · Estado: aguardando revisão
+Data: 2026-10-04 · Estado: implementado (ver "Medições")
 
 ## Problema
 
@@ -50,14 +50,28 @@ Fatos do harness que o desenho assume (documentação de hooks):
 - Todo hook recebe `session_id` e `cwd` em stdin; hooks rodam também para
   chamadas de subagentes, com o `session_id` da sessão dona.
 
-Três pontos não estão documentados e são medidos na primeira tarefa da
-implementação, antes de qualquer código que dependa deles:
+## Medições
 
-| Ponto | Uso | Se a medição contrariar |
+Três pontos não eram documentados e foram medidos com uma sessão `claude -p`
+descartável (hooks de sondagem que gravam o stdin cru), em 04/10/2026,
+Claude Code 2.1.28x:
+
+| Ponto | Medido | Efeito no desenho |
 |---|---|---|
-| Formato de `tool_input` da ferramenta `Skill` | reconhecer `deploy-prod` e `tarefa-finalizada` | a trava passa a ser tomada só pelos comandos Bash que essas skills executam |
-| Momento do `PostToolUse` em Bash com `run_in_background` | soltar a trava de deploy | já previsto: deploy de fundo usa prazo, ver "Ciclo da trava" |
-| `mcp__coolify__deploy`: nome exato e campos | reconhecer deploy via MCP | matcher ajustado ao nome real |
+| `tool_input` da ferramenta `Skill` | `{"skill": "<nome>", "args": "<texto>"}`; `PreToolUse` e `PostToolUse` disparam | usado como previsto |
+| `PostToolUse` de Bash com `run_in_background` | dispara **na hora do lançamento** (`duration_ms` ínfimo), não no fim do comando | deploy em segundo plano nunca solta no `post` nem no `Stop`; só por prazo, `SessionEnd`, morte da sessão ou liberação manual |
+| `$PPID` do hook | é o shell intermediário, não o Claude | não usado; a sessão é identificada por `session_id` ↔ `sessions/*.json` |
+| Sessões `claude -p` em `~/.claude/sessions/` | **não aparecem** | sessão sem registro vale pela atividade do arquivo de claim (`prazo_sessao_sem_registro_min`) e é limpa pelo `SessionEnd` |
+| `mcp__coolify__deploy` | recebe `tag_or_uuid`, nunca o nome do produto | o produto é resolvido pelo diretório de trabalho, não pelo argumento |
+| `additionalContext` do `PreToolUse` sem `permissionDecision` | entregue ao modelo, e a edição segue o fluxo normal de permissão | R3 usa exatamente isso; nunca `allow` |
+| `Stop` | traz `background_tasks` e `last_assistant_message` | não usados |
+
+Ao vivo, com duas sessões `claude -p` reais, `coolify` de mentira e hooks
+isolados por `--settings`: a segunda sessão foi negada com a mensagem da R1
+enquanto a primeira rodava, e só um processo do deploy executou; a trava saiu
+no fim do comando; a segunda edição do mesmo arquivo recebeu o aviso da R3
+dentro do contexto do modelo; `git checkout -b` foi negado pela R2 e a branch
+não mudou.
 
 ## Componentes
 
@@ -132,7 +146,9 @@ do seu arquivo em `claims/`: viva se tocado há menos de
 `prazo_sessao_sem_registro_min`.
 
 Não há heartbeat. Trava ou reivindicação de sessão morta é removida pela
-primeira chamada de hook ou de painel que a encontrar, com linha no log.
+primeira chamada de hook ou de painel que a encontrar, com linha no log. Um
+registro cujo processo acabou é morto de imediato; só a sessão sem nenhum
+registro usa o prazo.
 
 ### Resolução de produto e de árvore de trabalho
 
@@ -174,10 +190,10 @@ Comportamento:
 
 | Origem | Solta em |
 |---|---|
-| Bash em primeiro plano | `PostToolUse` daquela chamada |
+| Bash em primeiro plano (e deploy via MCP) | `PostToolUse` daquela chamada, casada por `tool_use_id` |
 | Bash com `run_in_background` | prazo `prazo_deploy_fundo_min`, ou morte da sessão, ou liberação manual |
-| Skill | `Stop` da sessão dona (fim do turno) |
-| Qualquer | morte da sessão dona; `orquestra.py liberar` |
+| Bash em primeiro plano ou skill | também no `Stop` (fim do turno): cobre `Esc` e comando interrompido, em que o `PostToolUse` não vem |
+| Qualquer | `SessionEnd` ou morte da sessão dona; `orquestra.py liberar` |
 
 A trava guarda a origem que a criou. Reentrada da mesma sessão não muda a
 origem: o `PostToolUse` de um `coolify deploy` rodado dentro de uma skill não
@@ -222,7 +238,7 @@ arquivo. Sem recado, sai sem saída.
 
 ### R5. Limpeza
 
-`Stop` solta travas de skill da sessão. Reivindicações de arquivo ficam até
+`Stop` solta as travas de Bash em primeiro plano e de skill da sessão; `SessionEnd` solta todas e apaga claim e recados. Reivindicações de arquivo ficam até
 a sessão morrer: uma sessão ociosa ainda tem alterações não commitadas
 naquela árvore.
 
@@ -269,11 +285,12 @@ Hooks registrados:
 | Evento | Matcher | Comando |
 |---|---|---|
 | `PreToolUse` | `Bash` | `orquestra.py hook pre-bash` |
-| `PreToolUse` | `Skill` e deploy do MCP Coolify | `orquestra.py hook pre-deploy` |
+| `PreToolUse` | `Skill` e deploy do MCP Coolify (`deploy`, `redeploy_project`, `restart_project_apps`) | `orquestra.py hook pre-deploy` |
 | `PreToolUse` | `Edit\|Write\|NotebookEdit` | `orquestra.py hook pre-edit` |
-| `PostToolUse` | `Bash` | `orquestra.py hook post-bash` |
-| `UserPromptSubmit` | (todos) | `orquestra.py hook prompt` |
+| `PostToolUse` | `Bash` e deploy do MCP Coolify | `orquestra.py hook post` |
+| `UserPromptSubmit` | (todos) | `orquestra.py hook prompt` (entrega recados e renova o claim) |
 | `Stop` | (todos) | `orquestra.py hook stop` |
+| `SessionEnd` | (todos) | `orquestra.py hook session-end` (remove claim, recados e travas da sessão) |
 
 Sessões já abertas só passam a usar os hooks depois de reiniciadas.
 
@@ -297,6 +314,14 @@ Sessões já abertas só passam a usar os hooks depois de reiniciadas.
    produto fictício cujo "deploy" é um `sleep`; confere R1, R2, R3 e R4.
 4. CI: `python3 -m py_compile` e `python3 -m unittest` do diretório
    `orquestra/`, junto das verificações já existentes.
+
+## Limitações conhecidas
+
+- Heredoc: uma linha de corpo de heredoc que comece com `coolify deploy` é lida como comando.
+- `sudo -u <usuário> cmd` e `timeout` com opções incomuns não são decompostos; o comando passa sem trava.
+- Deploy via MCP só é travado quando o diretório de trabalho da sessão está num produto configurado.
+- Duas remoções simultâneas de uma trava vencida têm uma janela mínima de corrida (renomear, conferir, devolver); o caso comum, duas aquisições simultâneas, é atômico (`os.link`) e testado.
+- As travas e claims só enxergam sessões da mesma máquina e do mesmo usuário.
 
 ## Fora do escopo
 
